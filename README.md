@@ -15,3 +15,17 @@ Embedding -> Dropout -> LSTMP（编码层） -> LSTMO（解码层）-> Fully Con
 	改进：让它降低吧！
 1. 可能还会出现难以解释的问题。。。TAT
 
+# INSTALL
+
+## Python Dependencies
+
+```shell
+pip3 install pylint
+
+```
+
+## Datasets
+
+```shell
+make dataset
+```
