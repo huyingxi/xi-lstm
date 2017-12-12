@@ -84,7 +84,7 @@ def load_data(source, dist, max_len, vocab_size):
       y[index].append('O')
       round -= 1
 
-  model = word2vec.Word2Vec.load('/Users/test/Desktop/RE/mode.bin')
+  model = word2vec.Word2Vec.load('data/word2vec/mode.bin')
 
   words = list(model.wv.vocab)
   X_ix_to_word = words
@@ -362,12 +362,18 @@ def run():
   doc me!
   '''
   X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data(
-      '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_x_real_filter.txt',
-      '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_y_real_filter.txt',
+      'data/train_test/train_x_real_filter.txt',
+      'data/train_test/train_y_real_filter.txt',
       MAX_LEN,
       VOCAB_SIZE,
   )
-  model = LSTMTagger(EMBED_DIM, HIDDEN_DIM, len(X_word_to_ix), len(y_word_to_ix), word_embed_weight)
+  model = LSTMTagger(
+      EMBED_DIM,
+      HIDDEN_DIM,
+      len(X_word_to_ix),
+      len(y_word_to_ix),
+      word_embed_weight,
+  )
   print(model)
 
   for name, param in model.named_parameters():
@@ -387,8 +393,8 @@ def run():
       centered=False,
   )
 
-  f = open('/Users/test/Desktop/RE/data/originaldata_new/train_test/train_x_real_filter.txt', 'r')
-  f1 = open('/Users/test/Desktop/RE/data/originaldata_new/train_test/train_y_real_filter.txt', 'r')
+  f = open('data/train_test/train_x_real_filter.txt', 'r')
+  f1 = open('data/train_test/train_y_real_filter.txt', 'r')
   X_test_data = f.read()
   Y_test_data = f1.read()
   f.close()
@@ -422,8 +428,8 @@ def run():
 
   count = 0
 
-  log = open('/Users/test/Desktop/RE/log.txt', 'w')
-  for epoch in xrange(NB_EPOCH):  # again, normally you would NOT do 300 epochs, it is toy data
+  log = open('data/log.txt', 'w')
+  for epoch in range(NB_EPOCH):  # again, normally you would NOT do 300 epochs, it is toy data
     print("epoch : ", epoch)
     for i in range(len(X) - BATCH_SIZE):
       print("batch : ", i)

@@ -36,7 +36,7 @@ mypy:
 .ONESHELL:
 download:
 	# https://stackoverflow.com/a/30590240/1123955
-	cd datasets
+	cd data
 	if [ ! -d train_test ]; then wget https://github.com/zixia/xi-lstm/releases/download/v0.0.1/train_test.zip && unzip train_test.zip && rm train_test.zip; fi
 	if [ ! -d word2vec ]; 	then wget https://github.com/zixia/xi-lstm/releases/download/v0.0.1/word2vec.zip && unzip word2vec.zip && rm word2vec.zip; 	fi
 	cd -
@@ -54,3 +54,6 @@ check-version:
 code:
 	# code src/	# vscode need to use src as root dir
 	PYTHONPATH=src/ code .
+
+run:
+	python3 src/lstmp-cell.py
