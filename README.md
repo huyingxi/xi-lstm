@@ -21,11 +21,17 @@ Embedding -> Dropout -> LSTMP（编码层） -> LSTMO（解码层）-> Fully Con
 
 ```shell
 pip3 install pylint
-
+pip3 install nltk gensim
 ```
 
 ## Datasets
 
 ```shell
-make dataset
+make download
 ```
+
+## VSCode Extensions
+
+1. Python
+1. EditorConfig
+
