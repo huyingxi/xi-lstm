@@ -6,11 +6,10 @@
 ## Python Dependencies
 
 ```shell
-pip3 install pylint
-pip3 install nltk gensim
+pip3 install -r requirements.txt 
 ```
 
-## Download
+## Data Files
 
 Download all the files that we needed automatically.
 
