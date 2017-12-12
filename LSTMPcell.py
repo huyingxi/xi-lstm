@@ -142,7 +142,7 @@ def prepare_sequence(seq, to_ix):
 
 
 class RNNModel(nn.Module):
-    def __init__(self, input_size, hidden_size, recurrent_size, num_layers, num_classes, return_sequences = True, bias=True, grad_clip=None, bidirectional=False):
+    def __init__(self, input_size, hidden_size, recurrent_size, num_layers, num_classes, return_sequences = True, bias=True, grad_clip=None, bidirectional=True):
         super(RNNModel, self).__init__()
         self.hidden_size = hidden_size
         self.recurrent_size = recurrent_size
