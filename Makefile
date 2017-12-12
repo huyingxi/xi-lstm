@@ -49,7 +49,7 @@ test: check-version lint
 
 .PHONY: check-version
 check-version:
-	./util/check_version.py
+	./scripts/check_version.py
 
 code:
 	# code src/	# vscode need to use src as root dir
