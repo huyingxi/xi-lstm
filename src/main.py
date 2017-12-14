@@ -205,16 +205,16 @@ class RNNModel_O(nn.Module):
     doc me!
     '''
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        recurrent_size,
-        num_layers,
-        num_classes,
-        return_sequences=True,
-        bias=True,
-        grad_clip=None,
-        bidirectional=False,
+            self,
+            input_size,
+            hidden_size,
+            recurrent_size,
+            num_layers,
+            num_classes,
+            return_sequences=True,
+            bias=True,
+            grad_clip=None,
+            bidirectional=False,
     ):
         super(RNNModel_O, self).__init__()
         self.hidden_size = hidden_size
@@ -318,7 +318,7 @@ class LSTMTagger(nn.Module):
         return tag_scores
 
 
-class LossFun(nn.Module):
+class LossFunc(nn.Module):
     '''
     doc me!
     '''
@@ -326,7 +326,7 @@ class LossFun(nn.Module):
         '''
         doc me!
         '''
-        super(LossFun, self).__init__()
+        super(LossFunc, self).__init__()
         self.beta = beta
         return
 
@@ -340,12 +340,12 @@ class LossFun(nn.Module):
         for batch in range((targets_in).size()[0]):             # batch loop
             for length in range((targets_in[0].size()[0])):     # words loop
                 if torch.equal(
-                    max_index[batch][length],
-                    targets_in[batch][length]
+                        max_index[batch][length],
+                        targets_in[batch][length]
                 ):
                     if torch.equal(
-                        targets_in[batch][length].data,
-                        torch.LongTensor(1).zero_()
+                            targets_in[batch][length].data,
+                            torch.LongTensor(1).zero_()
                     ):
                         loss -= torch.log(
                             targets_scores[batch][length][max_index[batch][length]]
@@ -430,7 +430,7 @@ def run():
             print(name, param.data)
 
     # loss_function = nn.NLLLoss()
-    loss_function = LossFun(beta=10)
+    loss_function = LossFunc(beta=10)
     # accuracy_function = AccuracyFun()
     optimizer = optim.RMSprop(
         model.parameters(),
