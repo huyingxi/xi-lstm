@@ -18,7 +18,12 @@ import os
 from torch.nn import Parameter
 from torch.autograd import Function
 
-from torch.nn.modules.rnn import LSTMP, LSTMO
+# from torch.nn.modules.rnn import LSTMP, LSTMO
+
+from xibase import (
+  LSTMO,
+  LSTMP,
+)
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-max_len', type=int, default=200)
@@ -84,7 +89,7 @@ def load_data(source, dist, max_len, vocab_size):
       y[index].append('O')
       round -= 1
 
-  model = word2vec.Word2Vec.load('../data/word2vec/mode.bin')
+  model = word2vec.Word2Vec.load('data/word2vec/mode.bin')
 
   words = list(model.wv.vocab)
   X_ix_to_word = words
@@ -93,7 +98,7 @@ def load_data(source, dist, max_len, vocab_size):
 
   weight = []
   for i in range(len(X_ix_to_word)):
-    if i in model.wv.vocab:
+    if X_ix_to_word[i] in model.wv.vocab:
       weight.append(model[X_ix_to_word[i]])
     else:
       weight.append([np.random.randn(300, )])
@@ -362,8 +367,8 @@ def run():
   doc me!
   '''
   X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data(
-      '../data/train_test/train_x_real_filter.txt',
-      '../data/train_test/train_y_real_filter.txt',
+      'data/train_test/train_x_real_filter.txt',
+      'data/train_test/train_y_real_filter.txt',
       MAX_LEN,
       VOCAB_SIZE,
   )
@@ -393,8 +398,8 @@ def run():
       centered=False,
   )
 
-  f = open('../data/train_test/train_x_real_filter.txt', 'r')
-  f1 = open('../data/train_test/train_y_real_filter.txt', 'r')
+  f = open('data/train_test/train_x_real_filter.txt', 'r')
+  f1 = open('data/train_test/train_y_real_filter.txt', 'r')
   X_test_data = f.read()
   Y_test_data = f1.read()
   f.close()
@@ -428,7 +433,7 @@ def run():
 
   count = 0
 
-  log = open('../data/log.txt', 'w')
+  log = open('data/log.txt', 'w')
   for epoch in range(NB_EPOCH):  # again, normally you would NOT do 300 epochs, it is toy data
     print("epoch : ", epoch)
     for i in range(len(X) - BATCH_SIZE):

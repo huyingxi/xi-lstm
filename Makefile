@@ -56,4 +56,4 @@ code:
 	PYTHONPATH=src/ code .
 
 run:
-	python3 src/lstmp-cell.py
+	python3 src/main.py
