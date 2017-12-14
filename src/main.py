@@ -98,9 +98,12 @@ def load_data(source, dist, max_len, vocab_size):
     weight = []
     for i in range(len(X_ix_to_word)):
         if X_ix_to_word[i] in model.wv.vocab:
-            weight.append(model[X_ix_to_word[i]])
+            weight_item = model[X_ix_to_word[i]].tolist()
+            print('weight.append model: {}'.format(type(weight_item)))
+            weight.append(weight_item)
         else:
-            weight.append([np.random.randn(300, )])
+            print('weight.append random')
+            weight.append(np.random.randn(300, ).tolist())
     dist = FreqDist(np.hstack(y))
     y_vocab = dist.most_common(vocab_size - 1)
 
@@ -131,8 +134,10 @@ def load_data(source, dist, max_len, vocab_size):
 
     return (
         X,
-        len(X_word_to_ix), X_word_to_ix, X_ix_to_word, y,
-        len(y_word_to_ix), y_word_to_ix, y_ix_to_word, weight,
+        len(X_word_to_ix), X_word_to_ix, X_ix_to_word,
+        y,
+        len(y_word_to_ix), y_word_to_ix, y_ix_to_word,
+        weight,
     )
 
 
@@ -274,7 +279,8 @@ class LSTMTagger(nn.Module):
         self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
 
         ipdb.set_trace()
-        weight = torch.from_numpy(np.array(word_embed_weight))
+        np_weight = np.array(word_embed_weight)
+        weight = torch.from_numpy(np_weight)
         self.word_embeddings.weight.data.copy_(weight)
 
         self.dropout = torch.nn.Dropout(0.5)
