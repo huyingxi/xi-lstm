@@ -1,13 +1,16 @@
 language: python
 python:
   - "3.6"
+
 # command to install dependencies
 install:
   - pip3 install -r requirements.txt
   - make download
+
 # command to run tests
 script:
   - make test # or py.test for Python versions 3.5 and below
+
 notifications:
   email:
     on_success: change
