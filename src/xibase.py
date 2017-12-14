@@ -1,6 +1,7 @@
 '''
 Xi Base for LSTM
 '''
+import torch
 
 from torch.autograd import (
     Variable,
@@ -128,8 +129,8 @@ class XiRNNBase(Module):
                     t_b = torch.stack(ts_b).transpose(0, 1)
 
                     h_o = torch.add(h, h_b)
-                    c_o = torch.add(c, c_o)
-                    t_o = torch.add(t, t_o)
+                    c_o = torch.add(c, c_b)
+                    t_o = torch.add(t, t_b)
 
                     output = (h_o, c_o, t_o)
                 elif self.mode.startswith('LSTM'):
@@ -140,8 +141,8 @@ class XiRNNBase(Module):
                     h_b = torch.stack(hs_b).transpose(0, 1)
                     c_b = torch.stack(cs_b).transpose(0, 1)
 
-                    h_o = torch.add(h, h_b)
-                    c_o = torch.add(c, c_b)
+                    h_o = torch.cat(h, h_b, -1)
+                    c_o = torch.cat(c, c_b, -1)
 
                     output = (h_o, c_o)
                 else:

@@ -17,6 +17,7 @@ from gensim.models import word2vec
 import os
 from torch.nn import Parameter
 from torch.autograd import Function
+import cPickle as pickle
 
 # from torch.nn.modules.rnn import LSTMP, LSTMO
 
@@ -260,6 +261,7 @@ class LSTMTagger(nn.Module):
     super(LSTMTagger, self).__init__()
     self.hidden_dim = hidden_dim
     self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
+    import ipdb;ipdb.set_trace()
     self.word_embeddings.weight.data.copy_(torch.from_numpy(np.array(word_embed_weight)))
     self.dropout = torch.nn.Dropout(0.5)
 
@@ -275,7 +277,7 @@ class LSTMTagger(nn.Module):
         bidirectional=True,
     )
     self.lstmo = RNNModel_O(
-        input_size=embedding_dim,
+        input_size=2*hidden_dim,
         hidden_size=2*hidden_dim,
         recurrent_size=2*hidden_dim,
         num_layers=1,
@@ -329,7 +331,8 @@ class LossFun(nn.Module):
             loss -= torch.log(targets_scores[batch][length][max_index[batch][length]])
           else:
             loss -= self.beta * torch.log(targets_scores[batch][length][max_index[batch][length]])
-
+        else:
+          loss -= torch.log(targets_scores[batch][length][targets_in[batch][length]])
     return loss/size
 
 
@@ -366,18 +369,39 @@ def run():
   '''
   doc me!
   '''
-  X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data(
-      'data/train_test/train_x_real_filter.txt',
-      'data/train_test/train_y_real_filter.txt',
-      MAX_LEN,
-      VOCAB_SIZE,
-  )
+  # X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data(
+  #     'data/train_test/train_x_real_filter.txt',
+  #     'data/train_test/train_y_real_filter.txt',
+  #     MAX_LEN,
+  #     VOCAB_SIZE,
+  # )
+
+  with open('/Users/test/Desktop/RE/data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
+    word_index = pickle.load(vocab)
+    embedding_matrix = pickle.load(vocab)
+  # X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight, padding_id = load_data(
+  #    '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_x_real_filter.txt', '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_y_real_filter.txt', MAX_LEN, VOCAB_SIZE)
+  X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_matrix, padding_id = load_data_new(
+    '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_x_real_filter.txt',
+    '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_y_real_filter.txt',
+    word_index, embedding_matrix, max_len=188)
+
+  embedding_matrix_new = []
+  for i in embedding_matrix:
+    embedding_matrix_new.append(i[0])
+
+
+  c = list(zip(X, y))
+  np.random.shuffle(c)
+  X[:], y[:] = zip(*c)
+
+
   model = LSTMTagger(
       EMBED_DIM,
       HIDDEN_DIM,
       len(X_word_to_ix),
       len(y_word_to_ix),
-      word_embed_weight,
+      embedding_matrix,
   )
   print(model)
 
