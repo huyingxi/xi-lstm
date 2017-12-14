@@ -262,12 +262,12 @@ class LSTMTagger(nn.Module):
     doc me!
     '''
     def __init__(
-        self,
-        embedding_dim,
-        hidden_dim,
-        vocab_size,
-        tagset_size,
-        word_embed_weight,
+            self,
+            embedding_dim,
+            hidden_dim,
+            vocab_size,
+            tagset_size,
+            word_embed_weight,
     ):
         super(LSTMTagger, self).__init__()
         self.hidden_dim = hidden_dim
@@ -503,5 +503,6 @@ def run():
                 log.write("current test loss : " + str(loss_test/BATCH_SIZE))
             count += 1
         log.close()
+
 
 run()
