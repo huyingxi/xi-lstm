@@ -14,7 +14,7 @@ import torch.autograd as autograd
 import torch.nn.functional as F
 import torch.optim as optim
 from gensim.models import word2vec
-import ipdb
+# import ipdb
 import os
 from torch.nn import Parameter
 from torch.autograd import Function
@@ -254,7 +254,7 @@ class LSTMTagger(nn.Module):
         self.hidden_dim = hidden_dim
         self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
 
-        ipdb.set_trace()
+        # ipdb.set_trace()
         np_weight = np.array(word_embed_weight)
         weight = torch.from_numpy(np_weight)
         self.word_embeddings.weight.data.copy_(weight)
@@ -460,12 +460,18 @@ def run():
     count = 0
 
     log = open('data/log.txt', 'w')
-    for epoch in range(NB_EPOCH):  # again, normally you would NOT do 300 epochs, it is toy data
+
+    # again, normally you would NOT do 300 epochs, it is toy data
+    for epoch in range(NB_EPOCH):
         print("epoch : ", epoch)
         for i in range(len(X) - BATCH_SIZE):
             print("batch : ", i)
             optimizer.zero_grad()
-            tag_scores, targets_in = predict(X[i:i+BATCH_SIZE], y[i:i+BATCH_SIZE], model)
+            tag_scores, targets_in = predict(
+                X[i:i+BATCH_SIZE],
+                y[i:i+BATCH_SIZE],
+                model,
+            )
             loss = loss_function(tag_scores, targets_in)
             loss.backward()
             print("current loss : ", loss.data)
@@ -479,12 +485,16 @@ def run():
                 # torch.save(model, '/Users/test/Desktop/RE/model')
                 print("{0} epoch , current training loss {1} : ".format(epoch, loss.data))
                 log.write(str(epoch) + "epoch" + "current trainning loss : " + str(loss.data))
-                test_scores, test_targets = predict(test_x[0:BATCH_SIZE], test_y[0:BATCH_SIZE], model)
+                test_scores, test_targets = predict(
+                    test_x[0:BATCH_SIZE],
+                    test_y[0:BATCH_SIZE],
+                    model,
+                )
                 loss_test = loss_function(test_scores, test_targets)
                 print(".............current test loss............ {} : ".format(loss_test/BATCH_SIZE))
                 log.write("current test loss : " + str(loss_test/BATCH_SIZE))
             count += 1
-        log.close()
+    log.close()
 
 
 run()
