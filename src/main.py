@@ -132,8 +132,10 @@ def load_data(source, dist, max_len, vocab_size):
 
     return (
         X,
-        len(X_word_to_ix), X_word_to_ix, X_ix_to_word, y,
-        len(y_word_to_ix), y_word_to_ix, y_ix_to_word, weight,
+        len(X_word_to_ix), X_word_to_ix, X_ix_to_word,
+        y,
+        len(y_word_to_ix), y_word_to_ix, y_ix_to_word,
+        weight,
     )
 
 
@@ -253,7 +255,8 @@ class LSTMTagger(nn.Module):
         self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
 
         ipdb.set_trace()
-        weight = torch.from_numpy(np.array(word_embed_weight))
+        np_weight = np.array(word_embed_weight)
+        weight = torch.from_numpy(np_weight)
         self.word_embeddings.weight.data.copy_(weight)
 
         self.dropout = torch.nn.Dropout(0.5)
