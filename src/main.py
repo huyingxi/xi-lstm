@@ -98,11 +98,9 @@ def load_data(source, dist, max_len, vocab_size):
     weight = []
     for i in range(len(X_ix_to_word)):
         if X_ix_to_word[i] in model.wv.vocab:
-            weight_item = model[X_ix_to_word[i]].tolist()
-            print('weight.append model: {}'.format(type(weight_item)))
+            weight_item = model[x_ix_to_word[i]].tolist()
             weight.append(weight_item)
         else:
-            print('weight.append random')
             weight.append(np.random.randn(300, ).tolist())
     dist = FreqDist(np.hstack(y))
     y_vocab = dist.most_common(vocab_size - 1)
@@ -139,28 +137,6 @@ def load_data(source, dist, max_len, vocab_size):
         len(y_word_to_ix), y_word_to_ix, y_ix_to_word,
         weight,
     )
-
-
-def process_data(word_sentences, max_len, word_to_ix):
-    '''
-    doc me!
-    '''
-    # Vectorizing each element in each sequence
-    sequences = np.zeros((len(word_sentences), max_len, len(word_to_ix)))
-    for i, sentence in enumerate(word_sentences):
-        for j, word in enumerate(sentence):
-            sequences[i, j, word] = 1.
-    return sequences
-
-
-def prepare_sequence(seq, to_ix):
-    '''
-    doc me!
-    '''
-    idxs = map(lambda w: to_ix[w], seq)
-    tensor = torch.LongTensor(idxs)
-    tensor = idxs
-    return autograd.Variable(tensor)
 
 
 class RNNModel(nn.Module):
