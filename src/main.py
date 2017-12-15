@@ -98,9 +98,10 @@ def load_data(source, dist, max_len, vocab_size):
     weight = []
     for i in range(len(X_ix_to_word)):
         if X_ix_to_word[i] in model.wv.vocab:
-            weight.append(model[X_ix_to_word[i]])
+            weight_item = model[x_ix_to_word[i]].tolist()
+            weight.append(weight_item)
         else:
-            weight.append([np.random.randn(300, )])
+            weight.append(np.random.randn(300, ).tolist())
     dist = FreqDist(np.hstack(y))
     y_vocab = dist.most_common(vocab_size - 1)
 
