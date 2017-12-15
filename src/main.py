@@ -137,28 +137,6 @@ def load_data(source, dist, max_len, vocab_size):
     )
 
 
-def process_data(word_sentences, max_len, word_to_ix):
-    '''
-    doc me!
-    '''
-    # Vectorizing each element in each sequence
-    sequences = np.zeros((len(word_sentences), max_len, len(word_to_ix)))
-    for i, sentence in enumerate(word_sentences):
-        for j, word in enumerate(sentence):
-            sequences[i, j, word] = 1.
-    return sequences
-
-
-def prepare_sequence(seq, to_ix):
-    '''
-    doc me!
-    '''
-    idxs = map(lambda w: to_ix[w], seq)
-    tensor = torch.LongTensor(idxs)
-    tensor = idxs
-    return autograd.Variable(tensor)
-
-
 class RNNModel(nn.Module):
     '''
     doc me!
