@@ -3,6 +3,8 @@
 
 # INSTALL
 
+Python3.6 is required.
+
 ## Python Dependencies
 
 ```shell
@@ -33,11 +35,8 @@ Those files include:
 make run
 ```
 
-# INTRO
+# MODEL
 
-1. LSTMPcell.py文件是模型的训练和测试文件
-1. modules.zip文件是pytorch被修改的部分，需要替换掉原本的torch/nn/modules
-1. 现在的模型是
 Embedding -> Dropout -> LSTMP（编码层） -> LSTMO（解码层）-> Fully Connected Layer -> Softmax
 
 # TODO LIST
