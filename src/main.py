@@ -1,28 +1,30 @@
 '''
 lstmp for xi
 '''
+import argparse
+# import ipdb
+import os
+import pickle
+import sys
+import string
+
+from nltk import FreqDist
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn._functions.rnn as rnn
 from torch.autograd import Variable
-import argparse
-from nltk import FreqDist
-import sys
-import string
-import numpy as np
 import torch.autograd as autograd
 import torch.nn.functional as F
 import torch.optim as optim
-from gensim.models import word2vec
-# import ipdb
-import os
 from torch.nn import Parameter
 from torch.autograd import Function
-import pickle
+
+from gensim.models import word2vec
 
 from xibase import (
-  LSTMO,
-  LSTMP,
+    LSTMO,
+    LSTMP,
 )
 
 ap = argparse.ArgumentParser()
@@ -47,10 +49,10 @@ EMBED_DIM = args['embed_dim']
 
 
 def text_to_word_sequence(
-    text,
-    filters=' \t\n',
-    lower=False,
-    split=" ",
+        text,
+        filters=' \t\n',
+        lower=False,
+        split=" ",
 ):
     '''
     doc me!
@@ -74,11 +76,11 @@ def load_data(source, dist, max_len, vocab_size):
     f.close()
 
     # Splitting raw text into array of sequences
-    X = [[i for i in (x.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
+    X = [[i for i in x.split(' ')] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
     X_max = max(map(len,X))
 
-    y = [[j for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
+    y = [[j for j in y.split(' ')] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
 
     for index in range(len(X)):
@@ -144,16 +146,16 @@ class RNNModel(nn.Module):
     doc me!
     '''
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        recurrent_size,
-        num_layers,
-        num_classes,
-        return_sequences=True,
-        bias=True,
-        grad_clip=None,
-        bidirectional=True
+            self,
+            input_size,
+            hidden_size,
+            recurrent_size,
+            num_layers,
+            num_classes,
+            return_sequences=True,
+            bias=True,
+            grad_clip=None,
+            bidirectional=True
     ):
         super(RNNModel, self).__init__()
         self.hidden_size = hidden_size
@@ -431,9 +433,9 @@ def run():
     f.close()
     f1.close()
     test_x = [text_to_word_sequence(x_)[::-1] for x_ in X_test_data.split('\n') if
-                len(x_.split(' ')) > 0 and len(x_.split(' ')) <= MAX_LEN]
+             len(x_.split(' ')) > 0 and len(x_.split(' ')) <= MAX_LEN]
     test_y = [text_to_word_sequence(y_)[::-1] for y_ in Y_test_data.split('\n') if
-                len(y_.split(' ')) > 0 and len(y_.split(' ')) <= MAX_LEN]
+             len(y_.split(' ')) > 0 and len(y_.split(' ')) <= MAX_LEN]
 
     X_max_test = max(map(len, test_x))
     for index in range(len(test_x)):
