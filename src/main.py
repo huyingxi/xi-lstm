@@ -452,7 +452,7 @@ def run():
 #        VOCAB_SIZE,
 #    )
 
-    with open('/Users/test/Desktop/RE/data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
+    with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
        word_index = pickle.load(vocab,encoding='latin1')
        embedding_matrix = pickle.load(vocab,encoding='latin1')
 
@@ -488,15 +488,18 @@ def run():
     # loss_function = nn.NLLLoss()
     loss_function = LossFunc(beta=10)
     # accuracy_function = AccuracyFun()
-    optimizer = optim.RMSprop(
-        model.parameters(),
-        lr=0.1,
-        alpha=0.99,
-        eps=1e-08,
-        weight_decay=0,
-        momentum=0,
-        centered=False,
-    )
+
+    optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+    # optimizer = optim.RMSprop(
+    #     model.parameters(),
+    #     lr=0.1,
+    #     alpha=0.99,
+    #     eps=1e-08,
+    #     weight_decay=0,
+    #     momentum=0,
+    #     centered=False,
+    # )
 
 #    f = open('data/train_test/train_x_real_filter.txt', 'r')
 #    f1 = open('data/train_test/train_y_real_filter.txt', 'r')
@@ -549,7 +552,10 @@ def run():
             )
             loss = loss_function(tag_scores, targets_in, y_ix_to_word, input_length[i:i+BATCH_SIZE])
             loss.backward()
+            optimizer.step()
+
             print("current loss : ", loss.data)
+
             # acc = accuracy_function(tag_scores, targets_in)
             # print('accuracy : ', acc)
             # p1 = list(model.parameters())[0].clone()
