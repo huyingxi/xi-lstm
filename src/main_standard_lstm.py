@@ -22,10 +22,10 @@ from torch.autograd import Function
 
 from gensim.models import word2vec
 
-from xibase import (
-    LSTMO,
-    LSTMP,
-)
+# from xibase import (
+#     LSTMO,
+#     LSTMP,
+# )
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-max_len', type=int, default=200)
@@ -78,14 +78,14 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
     # Splitting raw text into array of sequences
     X = [[i for i in (x.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
          len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-    X_max = max(map(len,X))
+    X_max = max(map(len, X))
     y = [[j for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
 
     word_index['UNK'] = len(word_index)
 
     b = np.random.rand(1,300)
-    np.append(embedding_weight,b, axis=0)
+    np.append(embedding_weight, b, axis=0)
     index_word = {word: ix for ix, word in enumerate(word_index)}
 
     for i, sentence in enumerate(X):
@@ -94,7 +94,6 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
                 X[i][j] = word_index[word]
             else:
                 X[i][j] = word_index['UNK']
-
 
     dist = FreqDist(np.hstack(y))
     y_vocab = dist.most_common()
@@ -110,12 +109,21 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
 
     for i, sentence in enumerate(X):
         round = X_max - len(X[i])
-        while(round):
+        while round:
             # X[i].append(0)
             y[i].append(0)
             round -= 1
 
-    return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
+    return (
+        X,
+        word_index,
+        index_word,
+        y,
+        y_word_to_ix,
+        y_ix_to_word,
+        embedding_weight,
+        seq_lengths,
+    )
 
 
 class LSTMTagger(nn.Module):
@@ -156,10 +164,7 @@ class LSTMTagger(nn.Module):
         self.hidden2tag = nn.Linear(2*hidden_dim, tagset_size, bias=True)
         self.softmax = nn.Softmax()
 
-    def forward(self, sentence):
-        '''
-        doc me!
-        '''
+    def forward(self, sentence, _):
         embeds = self.word_embeddings(sentence)
         embeds = self.dropout(embeds)
         embeds = self.lstmp(embeds)[0]
@@ -175,15 +180,12 @@ class LossFunc(nn.Module):
     doc me!
     '''
     def __init__(self, beta):
-        '''
-        doc me!
-        '''
         super(LossFunc, self).__init__()
         self.beta = beta
         return
 
     def forward(self, targets_scores, targets_in, y_ix_to_word, lengths):
-        length_matrix = np.zeros((64,188))
+        length_matrix = np.zeros((64, 188))
         for i in range(len(lengths)):
             for j in range(lengths[i]):
                 length_matrix[i][j] = 1
@@ -198,12 +200,12 @@ class LossFunc(nn.Module):
             for length in range((targets_in[0].size()[0])):     # words loop
                 if length_matrix[batch][length] == 1:
                     if torch.equal(
-                        max_index[batch][length],
-                        targets_in[batch][length]
+                            max_index[batch][length],
+                            targets_in[batch][length]
                     ):
                         if torch.equal(
-                            targets_in[batch][length].data,
-                            torch.LongTensor(1).zero_()
+                                targets_in[batch][length].data,
+                                torch.LongTensor(1).zero_()
                         ):
                             loss -= torch.log(
                                 targets_scores[batch][length][max_index[batch][length]]
@@ -233,15 +235,18 @@ class AccuracyFun(nn.Module):
 
 
 def predict(X, y, model, lengths):
+    '''
+    predict
+    '''
     model.zero_grad()
-    sentence_in = Variable(torch.zeros((len(X),188))).long()
+    sentence_in = Variable(torch.zeros((len(X), 188))).long()
     for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
         sentence_in[idx, :seqlen] = torch.LongTensor(seq)
     lengths = torch.LongTensor(lengths)
     lengths, perm_idx = lengths.sort(0, descending=True)
     sentence_in = sentence_in[perm_idx]
 
-    tag_scores = model(sentence_in,lengths)
+    tag_scores = model(sentence_in, lengths)
 
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
@@ -255,16 +260,21 @@ def run():
     doc me!
     '''
     with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
-       word_index = pickle.load(vocab,encoding='latin1')
-       embedding_matrix = pickle.load(vocab,encoding='latin1')
-    X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
-       'data/train_test/train_x_real_filter.txt',
-       'data/train_test/train_y_real_filter.txt',
-       word_index, embedding_matrix, max_len=188)
+        word_index = pickle.load(vocab, encoding='latin1')
+        embedding_matrix = pickle.load(vocab, encoding='latin1')
+
+    X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, \
+        y_ix_to_word, embedding_weight, input_length = load_data(
+            'data/train_test/train_x_real_filter.txt',
+            'data/train_test/train_y_real_filter.txt',
+            word_index,
+            embedding_matrix,
+            max_len=188,
+        )
 
     embedding_matrix_new = []
     for i in embedding_matrix:
-       embedding_matrix_new.append(i)
+        embedding_matrix_new.append(i)
 
     c = list(zip(X, y, input_length))
     np.random.shuffle(c)
@@ -343,9 +353,14 @@ def run():
                 X[i:i+BATCH_SIZE],
                 y[i:i+BATCH_SIZE],
                 model,
-                input_length[i:i+BATCH_SIZE]
+                input_length[i:i+BATCH_SIZE],
             )
-            loss = loss_function(tag_scores, targets_in, y_ix_to_word, input_length[i:i+BATCH_SIZE])
+            loss = loss_function(
+                tag_scores,
+                targets_in,
+                y_ix_to_word,
+                input_length[i:i+BATCH_SIZE],
+            )
             loss.backward()
             print("current loss : ", loss.data)
             # acc = accuracy_function(tag_scores, targets_in)
