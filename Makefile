@@ -55,3 +55,6 @@ run:
 
 run-standard:
 	python3 src/main_standard_lstm.py
+
+huan:
+	python3 src/huan.py

@@ -102,4 +102,4 @@ ENV/
 /t/
 .DS_Store
 /.idea/
-
+/.vscode/.ropeproject
