@@ -75,12 +75,10 @@ class XiRNNBase(Module):
             cell = Cell(**kwargs)
             setattr(self, 'cell{}'.format(i), cell)
 
-    def forward(self, input, initial_states=None):
+    def forward(self, input, initial_states, lengths):
         if initial_states is None:
             zeros = Variable(torch.zeros(input.size(0), self.hidden_size))
-            if self.mode == 'LSTM':
-                initial_states = [(zeros, zeros), ] * self.num_layers
-            elif self.mode == 'LSTMP':
+            if self.mode == 'LSTMP':
                 zeros_h = Variable(torch.zeros(input.size(0), self.recurrent_size))
                 initial_states = [(zeros_h, zeros), ] * self.num_layers
             elif self.mode == 'LSTMO':
@@ -94,18 +92,44 @@ class XiRNNBase(Module):
 
         states = initial_states[0]
         outputs = []
+        length_matrix = np.zeros((64,188))
+        for i in range(len(lengths)):
+            for j in range(lengths[i]):
+                length_matrix[i][j] = 1
 
-        time_steps = input.size(1)
+        time_steps = 188
         for t in range(time_steps):
             x = input[:, t, :]
             # for l in range(self.num_layers):
-            hx = getattr(self, 'cell{}'.format(0))(x, states[0])
-            states[0] = hx
-            if self.mode.startswith('LSTM'):
-                x = hx[0]
-            else:
-                x = hx
-            outputs.append(hx)
+            if self.mode == 'LSTMP':
+                hx,cx = getattr(self, 'cell{}'.format(0))(x, states[0])
+            elif self.mode == 'LSTMO':
+                hx,cx,tx = getattr(self, 'cell{}'.format(0))(x, states[0])
+            for j in range(len(length_matrix)):
+                if length_matrix[j][t]==0:
+                    if self.mode == 'LSTMP':
+                        index = Variable(torch.LongTensor([j]))
+                        hx = hx.clone()
+                        cx = cx.clone()
+                        hx.index_fill_(0,index,0)
+                        cx.index_fill_(0,index,0)
+
+                    elif self.mode == 'LSTMO':
+                        index = Variable(torch.LongTensor([j]))
+                        hx = hx.clone()
+                        cx = cx.clone()
+                        tx = tx.clone()
+                        hx.index_fill_(0,index,0)
+                        cx.index_fill_(0,index,0)
+                        tx.index_fill_(0,index,0)
+            if self.mode == 'LSTMP':
+                states[0] = (hx,cx)
+                output_item = (hx,cx)
+                outputs.append(output_item)
+            elif self.mode == 'LSTMO':
+                states[0] = (hx,cx,tx)
+                output_item = (hx,cx,tx)
+                outputs.append(output_item)
 
         outputs_bidirectional = []
         if self.bidirectional:
@@ -113,13 +137,32 @@ class XiRNNBase(Module):
             for t in range(time_steps):
                 x = input[:, time_steps-t-1, :]
                 # for l in range(self.num_layers):
-                hx = getattr(self, 'cell{}'.format(1))(x, states[0])
-                states[0] = hx
-                if self.mode.startswith('LSTM'):
-                    x = hx[0]
-                else:
-                    x = hx
-                outputs_bidirectional.append(hx)
+                if self.mode == 'LSTMP':
+                    hx,cx = getattr(self, 'cell{}'.format(1))(x, states[0])
+                elif self.mode == 'LSTMO':
+                    hx,cx,tx = getattr(self, 'cell{}'.format(1))(x, states[0])
+                for j in range(len(length_matrix)):
+                    index = Variable(torch.LongTensor([j]))
+                    if self.mode == 'LSTMP':
+                        hx = hx.clone()
+                        cx = cx.clone()
+                        hx.index_fill_(0,index,0)
+                        cx.index_fill_(0,index,0)
+                    elif self.mode == 'LSTMO':
+                        hx = hx.clone()
+                        cx = cx.clone()
+                        tx = tx.clone()
+                        hx.index_fill_(0,index,0)
+                        cx.index_fill_(0,index,0)
+                        tx.index_fill_(0,index,0)
+                if self.mode == 'LSTMP':
+                    states[0] = (hx,cx)
+                    output_item = (hx,cx)
+                    outputs_bidirectional.append(output_item)
+                elif self.mode == 'LSTMO':
+                    states[0] = (hx,cx,tx)
+                    output_item = (hx,cx,tx)
+                    outputs_bidirectional.append(output_item)
             outputs_bidirectional.reverse()
 
         if self.bidirectional:

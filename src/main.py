@@ -64,7 +64,7 @@ def text_to_word_sequence(
     return [i for i in seq if i]
 
 
-def load_data(source, dist, max_len, vocab_size):
+def load_data_old(source, dist, max_len, vocab_size):
     '''
     doc me!
     '''
@@ -141,6 +141,63 @@ def load_data(source, dist, max_len, vocab_size):
     )
 
 
+def load_data(source, dist, word_index, embedding_weight, max_len):
+    '''
+    doc me!
+    '''
+    f = open(source, 'r')
+    X_data = f.read()
+    f.close()
+    f = open(dist, 'r')
+    y_data = f.read()
+    f.close()
+
+    # Splitting raw text into array of sequences
+    X = [[i for i in (x.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
+         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
+    X_max = max(map(len,X))
+    y = [[j for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
+        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
+
+    word_index['UNK'] = len(word_index)
+
+    b = np.random.rand(1,300)
+    np.append(embedding_weight,b, axis=0)
+    index_word = {word: ix for ix, word in enumerate(word_index)}
+
+    for i, sentence in enumerate(X):
+        for j, word in enumerate(sentence):
+            if word in word_index:
+                X[i][j] = word_index[word]
+            else:
+                X[i][j] = word_index['UNK']
+
+
+    dist = FreqDist(np.hstack(y))
+    y_vocab = dist.most_common()
+    y_ix_to_word = [word[0] for word in y_vocab]
+    y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
+    for i, sentence in enumerate(y):
+        for j, word in enumerate(sentence):
+            if word in y_word_to_ix:
+                y[i][j] = y_word_to_ix[word]
+
+    seq_lengths = []
+    seq_lengths = (map(len, X))
+
+    for i, sentence in enumerate(X):
+        round = X_max - len(X[i])
+        while(round):
+            # X[i].append(0)
+            y[i].append(0)
+            round -= 1
+
+    return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
+
+
+
+
+
 class RNNModel(nn.Module):
     '''
     doc me!
@@ -168,14 +225,14 @@ class RNNModel(nn.Module):
         self.rnn = LSTMP(input_size, hidden_size, recurrent_size, num_layers=num_layers, bias=bias, return_sequences=return_sequences, grad_clip=grad_clip, bidirectional=bidirectional)
         # self.fc = nn.Linear(recurrent_size, num_classes, bias=bias)
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         # Set initial states
-        zeros_h = Variable(torch.zeros(x.size(0), self.recurrent_size))
-        zeros_c = Variable(torch.zeros(x.size(0), self.hidden_size))
+        zeros_h = Variable(torch.zeros(64, self.recurrent_size))
+        zeros_c = Variable(torch.zeros(64, self.hidden_size))
         initial_states = [[(zeros_h, zeros_c)] * self.num_layers] * self.num_directions
 
         # Forward propagate RNN
-        out = self.rnn(x, initial_states)
+        out = self.rnn(x, initial_states, lengths)
         # out, _ = self.rnn(x, initial_states=None)
 
         # Decode hidden state of last time step
@@ -219,7 +276,7 @@ class RNNModel_O(nn.Module):
         self.num_directions = 2 if bidirectional else 1
         # self.fc = nn.Linear(recurrent_size, num_classes, bias=bias)
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         '''
         doc me!
         '''
@@ -232,7 +289,7 @@ class RNNModel_O(nn.Module):
             * self.num_directions
 
         # Forward propagate RNN
-        out = self.rnn(x, initial_states)
+        out = self.rnn(x, initial_states, lengths)
         # out, _ = self.rnn(x, initial_states=None)
 
         # Decode hidden state of last time step
@@ -288,14 +345,14 @@ class LSTMTagger(nn.Module):
         self.hidden2tag = nn.Linear(2*hidden_dim, tagset_size, bias=True)
         self.softmax = nn.Softmax()
 
-    def forward(self, sentence):
+    def forward(self, sentence, lengths):
         '''
         doc me!
         '''
         embeds = self.word_embeddings(sentence)
         embeds = self.dropout(embeds)
-        embeds = self.lstmp(embeds)[0]
-        embeds = self.lstmo(embeds)[0]
+        embeds = self.lstmp(embeds, lengths)[0]
+        embeds = self.lstmo(embeds, lengths)[2]
         tag_space = self.hidden2tag(embeds)
         tag_scores = F.softmax(tag_space, dim=-1)
 
@@ -314,7 +371,12 @@ class LossFunc(nn.Module):
         self.beta = beta
         return
 
-    def forward(self, targets_scores, targets_in):
+    def forward(self, targets_scores, targets_in, y_ix_to_word, lengths):
+        length_matrix = np.zeros((64,188))
+        for i in range(len(lengths)):
+            for j in range(lengths[i]):
+                length_matrix[i][j] = 1
+
         loss = Variable(torch.zeros(1))
         max_index = torch.max(targets_scores, 2)[1]     # (64,188)
         a = targets_in.data
@@ -323,21 +385,22 @@ class LossFunc(nn.Module):
 
         for batch in range((targets_in).size()[0]):             # batch loop
             for length in range((targets_in[0].size()[0])):     # words loop
-                if torch.equal(
+                if length_matrix[batch][length] == 1:
+                    if torch.equal(
                         max_index[batch][length],
                         targets_in[batch][length]
-                ):
-                    if torch.equal(
+                    ):
+                        if torch.equal(
                             targets_in[batch][length].data,
                             torch.LongTensor(1).zero_()
-                    ):
-                        loss -= torch.log(
-                            targets_scores[batch][length][max_index[batch][length]]
-                        )
+                        ):
+                            loss -= torch.log(
+                                targets_scores[batch][length][max_index[batch][length]]
+                            )
+                        else:
+                            loss -= self.beta * torch.log(targets_scores[batch][length][max_index[batch][length]])
                     else:
-                        loss -= self.beta * torch.log(targets_scores[batch][length][max_index[batch][length]])
-                else:
-                    loss -= torch.log(targets_scores[batch][length][targets_in[batch][length]])
+                        loss -= torch.log(targets_scores[batch][length][targets_in[batch][length]])
 
         return loss/size
 
@@ -358,15 +421,20 @@ class AccuracyFun(nn.Module):
         return acc/size
 
 
-def predict(X, y, model):
+def predict(X, y, model, lengths):
     model.zero_grad()
-    sentence = np.asarray(X)
-    tensor = torch.from_numpy(sentence)
-    sentence_in = autograd.Variable(tensor)
+    sentence_in = Variable(torch.zeros((len(X),188))).long()
+    for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
+        sentence_in[idx, :seqlen] = torch.LongTensor(seq)
+    lengths = torch.LongTensor(lengths)
+    lengths, perm_idx = lengths.sort(0, descending=True)
+    sentence_in = sentence_in[perm_idx]
+
+    tag_scores = model(sentence_in,lengths)
+
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
     targets_in = autograd.Variable(targets)
-    tag_scores = model(sentence_in)
 
     return tag_scores, targets_in
 
@@ -375,30 +443,28 @@ def run():
     '''
     doc me!
     '''
-    X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data(
-        'data/train_test/train_x_real_filter.txt',
-        'data/train_test/train_y_real_filter.txt',
-        MAX_LEN,
-        VOCAB_SIZE,
-    )
+#    X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data_old(
+#        'data/train_test/train_x_real_filter.txt',
+#        'data/train_test/train_y_real_filter.txt',
+#        MAX_LEN,
+#        VOCAB_SIZE,
+#    )
 
-    # with open('/Users/test/Desktop/RE/data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
-    #   word_index = pickle.load(vocab)
-    #   embedding_matrix = pickle.load(vocab)
-    # # X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight, padding_id = load_data(
-    # #    '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_x_real_filter.txt', '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_y_real_filter.txt', MAX_LEN, VOCAB_SIZE)
-    # X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_matrix, padding_id = load_data_new(
-    #   '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_x_real_filter.txt',
-    #   '/Users/test/Desktop/RE/data/originaldata_new/train_test/train_y_real_filter.txt',
-    #   word_index, embedding_matrix, max_len=188)
+    with open('/Users/test/Desktop/RE/data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
+       word_index = pickle.load(vocab)
+       embedding_matrix = pickle.load(vocab)
+    X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
+       'data/train_test/train_x_real_filter.txt',
+       'data/train_test/train_y_real_filter.txt',
+       word_index, embedding_matrix, max_len=188)
 
-    # embedding_matrix_new = []
-    # for i in embedding_matrix:
-    #   embedding_matrix_new.append(i[0])
+    embedding_matrix_new = []
+    for i in embedding_matrix:
+       embedding_matrix_new.append(i)
 
-    c = list(zip(X, y))
+    c = list(zip(X, y, input_length))
     np.random.shuffle(c)
-    X[:], y[:] = zip(*c)
+    X[:], y[:], input_length = zip(*c)
 
     model = LSTMTagger(
         EMBED_DIM,
@@ -426,38 +492,38 @@ def run():
         centered=False,
     )
 
-    f = open('data/train_test/train_x_real_filter.txt', 'r')
-    f1 = open('data/train_test/train_y_real_filter.txt', 'r')
-    X_test_data = f.read()
-    Y_test_data = f1.read()
-    f.close()
-    f1.close()
-    test_x = [text_to_word_sequence(x_)[::-1] for x_ in X_test_data.split('\n') if
-             len(x_.split(' ')) > 0 and len(x_.split(' ')) <= MAX_LEN]
-    test_y = [text_to_word_sequence(y_)[::-1] for y_ in Y_test_data.split('\n') if
-             len(y_.split(' ')) > 0 and len(y_.split(' ')) <= MAX_LEN]
-
-    X_max_test = max(map(len, test_x))
-    for index in range(len(test_x)):
-        round = X_max_test - len(test_x[index])
-        while round:
-            test_x[index].append('.')
-            test_y[index].append('O')
-            round -= 1
-
-    for i, sentence in enumerate(test_x):
-        for j, word in enumerate(sentence):
-            if word in X_word_to_ix:
-                test_x[i][j] = X_word_to_ix[word]
-            else:
-                test_x[i][j] = X_word_to_ix['UNK']
-
-    for i, sentence in enumerate(test_y):
-        for j, word in enumerate(sentence):
-            if word in y_word_to_ix:
-                test_y[i][j] = y_word_to_ix[word]
-            else:
-                test_y[i][j] = y_word_to_ix['UNK']
+#    f = open('data/train_test/train_x_real_filter.txt', 'r')
+#    f1 = open('data/train_test/train_y_real_filter.txt', 'r')
+#    X_test_data = f.read()
+#    Y_test_data = f1.read()
+#    f.close()
+#    f1.close()
+#    test_x = [text_to_word_sequence(x_)[::-1] for x_ in X_test_data.split('\n') if
+#             len(x_.split(' ')) > 0 and len(x_.split(' ')) <= MAX_LEN]
+#    test_y = [text_to_word_sequence(y_)[::-1] for y_ in Y_test_data.split('\n') if
+#             len(y_.split(' ')) > 0 and len(y_.split(' ')) <= MAX_LEN]
+#
+#    X_max_test = max(map(len, test_x))
+#    for index in range(len(test_x)):
+#        round = X_max_test - len(test_x[index])
+#        while round:
+#            test_x[index].append('.')
+#            test_y[index].append('O')
+#            round -= 1
+#
+#    for i, sentence in enumerate(test_x):
+#        for j, word in enumerate(sentence):
+#            if word in X_word_to_ix:
+#                test_x[i][j] = X_word_to_ix[word]
+#            else:
+#                test_x[i][j] = X_word_to_ix['UNK']
+#
+#    for i, sentence in enumerate(test_y):
+#        for j, word in enumerate(sentence):
+#            if word in y_word_to_ix:
+#                test_y[i][j] = y_word_to_ix[word]
+#            else:
+#                test_y[i][j] = y_word_to_ix['UNK']
 
     count = 0
 
@@ -473,8 +539,9 @@ def run():
                 X[i:i+BATCH_SIZE],
                 y[i:i+BATCH_SIZE],
                 model,
+                input_length[i:i+BATCH_SIZE]
             )
-            loss = loss_function(tag_scores, targets_in)
+            loss = loss_function(tag_scores, targets_in, y_ix_to_word, input_length[i:i+BATCH_SIZE])
             loss.backward()
             print("current loss : ", loss.data)
             # acc = accuracy_function(tag_scores, targets_in)
@@ -483,19 +550,19 @@ def run():
             # optimizer.step()
             # p2 = list(model.parameters())[0].clone()
             # print(torch.equal(p1,p2))
-            if count % 100 == 0:
-                # torch.save(model, '/Users/test/Desktop/RE/model')
-                print("{0} epoch , current training loss {1} : ".format(epoch, loss.data))
-                log.write(str(epoch) + "epoch" + "current trainning loss : " + str(loss.data))
-                test_scores, test_targets = predict(
-                    test_x[0:BATCH_SIZE],
-                    test_y[0:BATCH_SIZE],
-                    model,
-                )
-                loss_test = loss_function(test_scores, test_targets)
-                print(".............current test loss............ {} : ".format(loss_test/BATCH_SIZE))
-                log.write("current test loss : " + str(loss_test/BATCH_SIZE))
-            count += 1
+#            if count % 100 == 0:
+#                # torch.save(model, '/Users/test/Desktop/RE/model')
+#                print("{0} epoch , current training loss {1} : ".format(epoch, loss.data))
+#                log.write(str(epoch) + "epoch" + "current trainning loss : " + str(loss.data))
+#                test_scores, test_targets = predict(
+#                    test_x[0:BATCH_SIZE],
+#                    test_y[0:BATCH_SIZE],
+#                    model,
+#                )
+#                loss_test = loss_function(test_scores, test_targets)
+#                print(".............current test loss............ {} : ".format(loss_test/BATCH_SIZE))
+#                log.write("current test loss : " + str(loss_test/BATCH_SIZE))
+#            count += 1
     log.close()
 
 
