@@ -48,3 +48,18 @@ Embedding -> Dropout -> LSTMP（编码层） -> LSTMO（解码层）-> Fully Con
 - [ ] 现状：LOSS为什么不变呢？  
 	改进：让它降低吧！
 - [ ] 可能还会出现难以解释的问题。。。TAT
+
+# TROUBLE SHOOTING
+
+## Make Sure That Pytorch Using GPU To Compute
+
+See: https://discuss.pytorch.org/t/solved-make-sure-that-pytorch-using-gpu-to-compute/4870/11
+
+```
+nvidia-smi
+python -c 'import torch; print(torch.rand(2,3).cuda())'
+```
+
+> If the first fails, your drivers have some issue, or you dont have an (NVIDIA) GPU :stuck_out_tongue:
+> If the second fails, your pytorch instalaltion isnt able to contact the gpu for some reason (eg you didnt do conda install cuda80 -c soumith etc…)
+
