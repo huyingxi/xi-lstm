@@ -41,10 +41,6 @@ Embedding -> Dropout -> LSTMP（编码层） -> LSTMO（解码层）-> Fully Con
 
 # TODO LIST
 
-- [ ] 现状：LSTMP（编码层）应该是双向的，而且我在模型中的bidirectional = True进行了设置，但是现在还是单向的  
-    改进：为什么还是单向的呢！！？？
-- [ ] 现状：每个句子的长度不同，现在取最大值188个单词进行padding，padding为‘O’；比如：一个句子本来只有40个单词，padding到188个单词，所以后面（还是前面？）会多148个占为标签‘O’，那么LSTM的输入也是（batch_size, 188, 300），输出也是(batch_size, 188, 300)  
-    改进：能够在LSTMP和LSTMO中实现对padding‘O’的过滤，即：能不能将padding的无效标签在通过LSTM自动删除，将上述40(N)个单词的输入通过LSTM之后变成（batch_size，40(N)，300）,N可变
-- [ ] 现状：LOSS为什么不变呢？  
-	改进：让它降低吧！
+- [ ] 现状：查看了EMBEDDING部分应该没有问题，但是输入到LSTMP layer和LSTMO layer之后对每句话的输出分布极为相似，导致后面对每个单词的标签预测都是同一个值，因此LOSS不降。标准LSTM的LOSS也不降，且标准LSTM layer1对每句话的输出分布不同，到标准LSTM layer2对每句话的输出分布就很相似了。
+    改进：为什么分布几乎一样呢？
 - [ ] 可能还会出现难以解释的问题。。。TAT
