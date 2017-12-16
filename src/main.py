@@ -471,7 +471,7 @@ def run():
         HIDDEN_DIM,
         len(X_word_to_ix),
         len(y_word_to_ix),
-        word_embed_weight,
+        embedding_matrix_new,
     )
     print(model)
 
