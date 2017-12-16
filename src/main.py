@@ -161,8 +161,10 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
 
     word_index['UNK'] = len(word_index)
 
-    b = np.random.rand(1,300)
-    np.append(embedding_weight,b, axis=0)
+    b = np.random.rand(1, 300)
+    print(type(embedding_weight))
+    print(len(b))
+    np.append(embedding_weight, b, axis=0)
     index_word = {word: ix for ix, word in enumerate(word_index)}
 
     for i, sentence in enumerate(X):
@@ -430,7 +432,7 @@ def predict(X, y, model, lengths):
     lengths, perm_idx = lengths.sort(0, descending=True)
     sentence_in = sentence_in[perm_idx]
 
-    tag_scores = model(sentence_in,lengths)
+    tag_scores = model(sentence_in, lengths)
 
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
@@ -450,17 +452,21 @@ def run():
 #        VOCAB_SIZE,
 #    )
 
-    with open('/Users/test/Desktop/RE/data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
-       word_index = pickle.load(vocab)
-       embedding_matrix = pickle.load(vocab)
+    with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
+        word_index = pickle.load(vocab)
+        embedding_matrix = pickle.load(vocab)
+
     X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
-       'data/train_test/train_x_real_filter.txt',
-       'data/train_test/train_y_real_filter.txt',
-       word_index, embedding_matrix, max_len=188)
+        'data/train_test/train_x_real_filter.txt',
+        'data/train_test/train_y_real_filter.txt',
+        word_index,
+        embedding_matrix,
+        max_len=188,
+    )
 
     embedding_matrix_new = []
     for i in embedding_matrix:
-       embedding_matrix_new.append(i)
+        embedding_matrix_new.append(i)
 
     c = list(zip(X, y, input_length))
     np.random.shuffle(c)
