@@ -145,7 +145,7 @@ class LSTMTagger(nn.Module):
         # ipdb.set_trace()
         np_weight = np.array(word_embed_weight)
         weight = torch.from_numpy(np_weight)
-        self.word_embeddings.weight.data.copy_(weight)
+        self.word_embeddings.weight.data.copy_(weight).cuda()
 
         self.dropout = torch.nn.Dropout(0.5)
 
@@ -154,21 +154,23 @@ class LSTMTagger(nn.Module):
             hidden_size=hidden_dim,
             batch_first=True,
             bidirectional=True,
-        )
+        ).cuda()
+
         self.lstmo = nn.LSTM(
             input_size=2*hidden_dim,
             hidden_size=2*hidden_dim,
             batch_first=True,
             bidirectional=False,
-        )
-        self.hidden2tag = nn.Linear(2*hidden_dim, tagset_size, bias=True)
-        self.softmax = nn.Softmax()
+        ).cuda()
+
+        self.hidden2tag = nn.Linear(2*hidden_dim, tagset_size, bias=True).cuda()
+        self.softmax = nn.Softmax().cuda()
 
     def forward(self, sentence, _):
-        embeds = self.word_embeddings(sentence)
-        embeds = self.dropout(embeds)
-        embeds = self.lstmp(embeds)[0]
-        embeds = self.lstmo(embeds)[0]
+        embeds = self.word_embeddings(sentence).cuda()
+        embeds = self.dropout(embeds).cuda()
+        embeds = self.lstmp(embeds)[0].cuda()
+        embeds = self.lstmo(embeds)[0].cuda()
         tag_space = self.hidden2tag(embeds)
         tag_scores = F.softmax(tag_space, dim=-1)
 
@@ -190,10 +192,10 @@ class LossFunc(nn.Module):
             for j in range(lengths[i]):
                 length_matrix[i][j] = 1
 
-        loss = Variable(torch.zeros(1))
+        loss = Variable(torch.zeros(1)).cuda()
         max_index = torch.max(targets_scores, 2)[1]     # (64,188)
         a = targets_in.data
-        a = a.numpy()
+        a = a.cpu().numpy()
         size = len(a)
 
         for batch in range((targets_in).size()[0]):             # batch loop
@@ -205,7 +207,7 @@ class LossFunc(nn.Module):
                     ):
                         if torch.equal(
                                 targets_in[batch][length].data,
-                                torch.LongTensor(1).zero_()
+                                torch.LongTensor(1).zero_().cuda()
                         ):
                             loss -= torch.log(
                                 targets_scores[batch][length][max_index[batch][length]]
@@ -241,16 +243,16 @@ def predict(X, y, model, lengths):
     model.zero_grad()
     sentence_in = Variable(torch.zeros((len(X), 188))).long()
     for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
-        sentence_in[idx, :seqlen] = torch.LongTensor(seq)
+        sentence_in[idx, :seqlen] = torch.LongTensor(seq).cuda()
     lengths = torch.LongTensor(lengths)
     lengths, perm_idx = lengths.sort(0, descending=True)
     sentence_in = sentence_in[perm_idx]
 
-    tag_scores = model(sentence_in, lengths)
+    tag_scores = model(sentence_in.cuda(), lengths.cuda())
 
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
-    targets_in = autograd.Variable(targets)
+    targets_in = autograd.Variable(targets).cuda()
 
     return tag_scores, targets_in
 
@@ -287,7 +289,7 @@ def run():
         len(X_word_to_ix),
         len(y_word_to_ix),
         embedding_matrix_new,
-    )
+    ).cuda()
     print(model)
 
     for name, param in model.named_parameters():
@@ -297,59 +299,26 @@ def run():
     # loss_function = nn.NLLLoss()
     loss_function = LossFunc(beta=10)
     # accuracy_function = AccuracyFun()
-    optimizer = optim.RMSprop(
-        model.parameters(),
-        lr=1e-2,
-        alpha=0.99,
-        eps=1e-08,
-        weight_decay=0,
-        momentum=0,
-        centered=False,
-    )
 
-#    f = open('data/train_test/train_x_real_filter.txt', 'r')
-#    f1 = open('data/train_test/train_y_real_filter.txt', 'r')
-#    X_test_data = f.read()
-#    Y_test_data = f1.read()
-#    f.close()
-#    f1.close()
-#    test_x = [text_to_word_sequence(x_)[::-1] for x_ in X_test_data.split('\n') if
-#             len(x_.split(' ')) > 0 and len(x_.split(' ')) <= MAX_LEN]
-#    test_y = [text_to_word_sequence(y_)[::-1] for y_ in Y_test_data.split('\n') if
-#             len(y_.split(' ')) > 0 and len(y_.split(' ')) <= MAX_LEN]
-#
-#    X_max_test = max(map(len, test_x))
-#    for index in range(len(test_x)):
-#        round = X_max_test - len(test_x[index])
-#        while round:
-#            test_x[index].append('.')
-#            test_y[index].append('O')
-#            round -= 1
-#
-#    for i, sentence in enumerate(test_x):
-#        for j, word in enumerate(sentence):
-#            if word in X_word_to_ix:
-#                test_x[i][j] = X_word_to_ix[word]
-#            else:
-#                test_x[i][j] = X_word_to_ix['UNK']
-#
-#    for i, sentence in enumerate(test_y):
-#        for j, word in enumerate(sentence):
-#            if word in y_word_to_ix:
-#                test_y[i][j] = y_word_to_ix[word]
-#            else:
-#                test_y[i][j] = y_word_to_ix['UNK']
+    optimizer = optim.SGD(model.parameters(), lr=0.01)
+    # optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    # optimizer = optim.RMSprop(model.parameters())
 
-    count = 0
+    # optimizer = optim.RMSprop(
+    #     model.parameters(),
+    #     lr=1e-2,
+    #     alpha=0.99,
+    #     eps=1e-08,
+    #     weight_decay=0,
+    #     momentum=0.1,
+    #     centered=False,
+    # )
 
-    log = open('data/log.txt', 'w')
-
-    # again, normally you would NOT do 300 epochs, it is toy data
     for epoch in range(NB_EPOCH):
         print("epoch : ", epoch)
         for i in range(len(X) - BATCH_SIZE):
             print("batch : ", i)
-            optimizer.zero_grad()
+            # optimizer.zero_grad()
             tag_scores, targets_in = predict(
                 X[i:i+BATCH_SIZE],
                 y[i:i+BATCH_SIZE],
@@ -363,27 +332,9 @@ def run():
                 input_length[i:i+BATCH_SIZE],
             )
             loss.backward()
+            optimizer.step()
+
             print("current loss : ", loss.data)
-            # acc = accuracy_function(tag_scores, targets_in)
-            # print('accuracy : ', acc)
-            # p1 = list(model.parameters())[0].clone()
-            # optimizer.step()
-            # p2 = list(model.parameters())[0].clone()
-            # print(torch.equal(p1,p2))
-#            if count % 100 == 0:
-#                # torch.save(model, '/Users/test/Desktop/RE/model')
-#                print("{0} epoch , current training loss {1} : ".format(epoch, loss.data))
-#                log.write(str(epoch) + "epoch" + "current trainning loss : " + str(loss.data))
-#                test_scores, test_targets = predict(
-#                    test_x[0:BATCH_SIZE],
-#                    test_y[0:BATCH_SIZE],
-#                    model,
-#                )
-#                loss_test = loss_function(test_scores, test_targets)
-#                print(".............current test loss............ {} : ".format(loss_test/BATCH_SIZE))
-#                log.write("current test loss : " + str(loss_test/BATCH_SIZE))
-#            count += 1
-    log.close()
 
 
 run()
