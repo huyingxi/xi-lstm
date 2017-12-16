@@ -54,4 +54,4 @@ run:
 	python3 src/main.py
 
 run-standard:
-	python3 src/main-standard-lstm.py
+	python3 src/main_standard_lstm.py
