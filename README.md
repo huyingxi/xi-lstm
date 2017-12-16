@@ -33,6 +33,10 @@ Those files include:
 
 ```shell
 make run
+
+# OR
+
+make run-standard
 ```
 
 # MODEL
