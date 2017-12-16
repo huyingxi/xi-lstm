@@ -52,3 +52,6 @@ code:
 
 run:
 	python3 src/main.py
+
+run-standard:
+	python3 src/main-standard-lstm.py

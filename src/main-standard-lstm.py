@@ -254,7 +254,7 @@ def run():
     '''
     doc me!
     '''
-    with open('/Users/test/Desktop/RE/data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
+    with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
        word_index = pickle.load(vocab,encoding='latin1')
        embedding_matrix = pickle.load(vocab,encoding='latin1')
     X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
