@@ -511,8 +511,8 @@ def run():
        embedding_matrix = pickle.load(vocab,encoding='latin1')
 
     X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
-        'data/multi_label/train_test/train_x_real_filter.txt',
-        'data/multi_label/train_test/train_y_real_filter.txt',
+        'data/multi_label/train_test/train_x_real.txt',
+        'data/multi_label/train_test/train_y_real.txt',
         word_index,
         embedding_matrix,
         max_len=188,
