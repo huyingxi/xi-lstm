@@ -19,6 +19,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn import Parameter
 from torch.autograd import Function
+import itertools
+
 
 from gensim.models import word2vec
 
@@ -156,8 +158,8 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
     X = [[i for i in (x.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
          len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
     X_max = max(map(len,X))
-    y = [[j for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
+    y = [[[i for i in j.split('#')] for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
+         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
 
     word_index['UNK'] = len(word_index)
 
@@ -174,25 +176,32 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
             else:
                 X[i][j] = word_index['UNK']
 
+    y_vocab_ = set()
+    for index_1, sentence in enumerate(y):
+        for index_2, word in enumerate(sentence):
+            for index_3, index in enumerate(word):
+                if len(y[index_1][index_2][index_3]) >= 1:
+                    y_vocab_.add(y[index_1][index_2][index_3])
 
-    dist = FreqDist(np.hstack(y))
-    y_vocab = dist.most_common()
-    y_ix_to_word = [word[0] for word in y_vocab]
+    y_vocab = list(y_vocab_)
+
+    y_ix_to_word = [word for index, word in enumerate(y_vocab)]
     y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
     for i, sentence in enumerate(y):
         for j, word in enumerate(sentence):
-            if word in y_word_to_ix:
-                y[i][j] = y_word_to_ix[word]
+            for m, index in enumerate(word):
+                if len(index):
+                    if index in y_word_to_ix:
+                        y[i][j][m] = y_word_to_ix[index]
 
     seq_lengths = []
     seq_lengths = (map(len, X))
 
-    for i, sentence in enumerate(X):
-        round = X_max - len(X[i])
-        while(round):
-            # X[i].append(0)
-            y[i].append(0)
-            round -= 1
+    for i, sentence in enumerate(y):
+        round = X_max - len(y[i])
+        for j in range(round):
+            for m in range(len(y[0][0])):
+                y[i][j][m] = y_word_to_ix['O']
 
     return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
 
@@ -408,6 +417,49 @@ class LossFunc(nn.Module):
 
 
 
+class MultiLabel_LossFunc(nn.Module):
+    '''
+    doc me!
+    '''
+    def __init__(self, y_vocab_size):
+        '''
+        doc me!
+        '''
+        super(MultiLabel_LossFunc, self).__init__()
+        self.y_vocab_size = y_vocab_size
+        return
+
+    def forward(self, targets_scores, targets_in, y_ix_to_word, lengths):
+        length_matrix = np.zeros((64,188))
+        for i in range(len(lengths)):
+            for j in range(lengths[i]):
+                length_matrix[i][j] = 1
+
+        loss = Variable(torch.zeros(1))
+        a = targets_in.data
+        a = a.numpy()
+        size = len(a)
+
+        for batch in range((targets_in).size()[0]):             # batch loop
+            for length in range((targets_in[0].size()[0])):     # words loop
+                if length_matrix[batch][length] == 1:           # if current word is not padding
+                    y_c_index = []                              # current word's tags set
+                    y_index = []                                # the complement of current word's tags set
+                    for index in range(targets_in[batch][length].size()[0]):
+                        if (int(targets_in[batch][length][index].data.numpy() == 0)):
+                            y_c_index.append(index)
+                        else:
+                            y_index.append(index)
+                    index = list(itertools.product(y_index, y_c_index))
+
+                    for pair in index:
+                        for i in range(self.y_vocab_size):
+                            loss += torch.exp((targets_scores[batch][length][pair[0]] - targets_scores[batch][length][pair[1]]))
+
+        return loss/size
+
+
+
 class AccuracyFun(nn.Module):
     '''
     doc me!
@@ -419,12 +471,9 @@ class AccuracyFun(nn.Module):
     def forward(self, targets_scores, targets_in):
         total_tag_number = torch.nonzero(targets_in).size(0)
         targets_in_clone = targets_in.clone()
-        targets_in_clone[targets_in==0] = 1
+        targets_in_clone[targets_in == 0] = 1
         hit_tags = (torch.max(targets_scores, 2)[1].view(targets_in.size()).data == targets_in_clone.data).sum()
 
-        # a = targets_in.data
-        # a = a.numpy()
-        # size = len(a)
         return hit_tags/total_tag_number
 
 
@@ -462,8 +511,8 @@ def run():
        embedding_matrix = pickle.load(vocab,encoding='latin1')
 
     X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
-        'data/train_test/train_x_real_filter.txt',
-        'data/train_test/train_y_real_filter.txt',
+        'data/multi_label/train_test/train_x_real_filter.txt',
+        'data/multi_label/train_test/train_y_real_filter.txt',
         word_index,
         embedding_matrix,
         max_len=188,
@@ -491,7 +540,8 @@ def run():
             print(name, param.data)
 
     # loss_function = nn.NLLLoss()
-    loss_function = LossFunc(beta=10)
+    # loss_function = LossFunc(beta=10)
+    loss_function = MultiLabel_LossFunc(y_vocab_size = len(y_ix_to_word))
     accuracy_function = AccuracyFun()
 
     optimizer = optim.SGD(model.parameters(), lr=0.01)
