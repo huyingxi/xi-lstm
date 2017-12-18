@@ -546,8 +546,8 @@ def run():
     # again, normally you would NOT do 300 epochs, it is toy data
     for epoch in range(NB_EPOCH):
         print("epoch : ", epoch)
-        for i in range(len(X) - BATCH_SIZE):
-            print("batch : ", i)
+        for i in range(0, (len(X) - 2*BATCH_SIZE), BATCH_SIZE):
+            print("batch {0}, total_batch {1}: ".format(int(i/BATCH_SIZE),int(len(X)/BATCH_SIZE)))
             optimizer.zero_grad()
             tag_scores, targets_in = predict(
                 X[i:i+BATCH_SIZE],
