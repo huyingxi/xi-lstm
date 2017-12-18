@@ -66,82 +66,6 @@ def text_to_word_sequence(
     return [i for i in seq if i]
 
 
-def load_data_old(source, dist, max_len, vocab_size):
-    '''
-    doc me!
-    '''
-    f = open(source, 'r')
-    X_data = f.read()
-    f.close()
-    f = open(dist, 'r')
-    y_data = f.read()
-    f.close()
-
-    # Splitting raw text into array of sequences
-    X = [[i for i in x.split(' ')] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-    X_max = max(map(len,X))
-
-    y = [[j for j in y.split(' ')] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-
-    for index in range(len(X)):
-        round = X_max - len(X[index])
-        while(round):
-            X[index].append('.')
-            y[index].append('O')
-            round -= 1
-
-    model = word2vec.Word2Vec.load('data/word2vec/mode.bin')
-
-    words = list(model.wv.vocab)
-    X_ix_to_word = words
-    X_ix_to_word.append('UNK')
-    X_word_to_ix = {word: ix for ix, word in enumerate(X_ix_to_word)}
-
-    weight = []
-    for i in range(len(X_ix_to_word)):
-        if X_ix_to_word[i] in model.wv.vocab:
-            weight_item = model[X_ix_to_word[i]].tolist()
-            weight.append(weight_item)
-        else:
-            weight.append(np.random.randn(300, ).tolist())
-    dist = FreqDist(np.hstack(y))
-    y_vocab = dist.most_common(vocab_size - 1)
-
-    count_in = 0
-    count_out = 0
-    for i, sentence in enumerate(X):
-        for j, word in enumerate(sentence):
-            if word in X_word_to_ix:
-                count_in += 1
-                X[i][j] = X_word_to_ix[word]
-            else:
-                count_out += 1
-                X[i][j] = X_word_to_ix['UNK']
-
-    y_ix_to_word = [word[0] for word in y_vocab]
-    y_ix_to_word.append('UNK')
-    y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
-    count_in = 0
-    count_out = 0
-    for i, sentence in enumerate(y):
-        for j, word in enumerate(sentence):
-            if word in y_word_to_ix:
-                count_in += 1
-                y[i][j] = y_word_to_ix[word]
-            else:
-                count_out += 1
-                y[i][j] = y_word_to_ix['UNK']
-
-    return (
-        X,
-        len(X_word_to_ix), X_word_to_ix, X_ix_to_word,
-        y,
-        len(y_word_to_ix), y_word_to_ix, y_ix_to_word,
-        weight,
-    )
-
 
 def load_data(source, dist, word_index, embedding_weight, max_len):
     '''
@@ -161,11 +85,10 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
     y = [[[i for i in j.split('#')] for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
          len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
 
+
     word_index['UNK'] = len(word_index)
 
     b = np.random.rand(1, 300)
-    print(type(embedding_weight))
-    print(len(b))
     np.append(embedding_weight, b, axis=0)
     index_word = {word: ix for ix, word in enumerate(word_index)}
 
@@ -185,6 +108,7 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
 
     y_vocab = list(y_vocab_)
 
+    print("done")
     y_ix_to_word = [word for index, word in enumerate(y_vocab)]
     y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
     for i, sentence in enumerate(y):
@@ -193,15 +117,13 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
                 if len(index):
                     if index in y_word_to_ix:
                         y[i][j][m] = y_word_to_ix[index]
+        round = X_max - len(sentence)
+        for n in range(round):
+            y[i].append(len(y_vocab)*[y_word_to_ix['O']])
 
     seq_lengths = []
     seq_lengths = (map(len, X))
 
-    for i, sentence in enumerate(y):
-        round = X_max - len(y[i])
-        for j in range(round):
-            for m in range(len(y[0][0])):
-                y[i][j][m] = y_word_to_ix['O']
 
     return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
 
@@ -489,6 +411,7 @@ def predict(X, y, model, lengths):
     tag_scores = model(sentence_in, lengths)
 
     tags = np.asarray(y)
+    import ipdb;ipdb.set_trace()
     targets = torch.from_numpy(tags)
     targets_in = autograd.Variable(targets)
 
@@ -517,6 +440,7 @@ def run():
         embedding_matrix,
         max_len=188,
     )
+    import ipdb;ipdb.set_trace()
 
     embedding_matrix_new = []
     for i in embedding_matrix:
@@ -596,8 +520,8 @@ def run():
     # again, normally you would NOT do 300 epochs, it is toy data
     for epoch in range(NB_EPOCH):
         print("epoch : ", epoch)
-        for i in range(len(X) - BATCH_SIZE):
-            print("batch : ", i)
+        for i in range(0, (len(X)-2*BATCH_SIZE), BATCH_SIZE):
+            print("batch {0}, total_batch {1}: ".format(i, int(len(X)/BATCH_SIZE)))
             optimizer.zero_grad()
             tag_scores, targets_in = predict(
                 X[i:i+BATCH_SIZE],
