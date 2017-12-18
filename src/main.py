@@ -54,53 +54,93 @@ def text_to_word_sequence(
     return [i for i in seq if i]
 
 
-class LossFunc(nn.Module):
-    '''
-    doc me!
-    '''
-    def __init__(self, beta):
-        '''
-        doc me!
-        '''
-        super(LossFunc, self).__init__()
-        self.beta = beta
-        return
+def loss_func(
+        targets_scores,
+        targets_ground_truth,
+        y_ix_to_word,
+        lengths,
+        beta=10,
+) -> float:
+    length_matrix = np.zeros((64, 188))
+    for i in range(len(lengths)):
+        for j in range(lengths[i]):
+            length_matrix[i][j] = 1
 
-    def forward(self, targets_scores, targets_ground_truth, y_ix_to_word, lengths):
-        length_matrix = np.zeros((64, 188))
-        for i in range(len(lengths)):
-            for j in range(lengths[i]):
-                length_matrix[i][j] = 1
+    loss = Variable(torch.zeros(1))
+    max_index = torch.max(targets_scores, 2)[1]     # (64,188)
+    # a = targets_ground_truth
+    # a = a.numpy()
+    size = len(targets_ground_truth)
 
-        loss = Variable(torch.zeros(1))
-        max_index = torch.max(targets_scores, 2)[1]     # (64,188)
-        a = targets_ground_truth
-        a = a.numpy()
-        size = len(a)
-
-        for sentence_idx in range((targets_ground_truth).size()[0]):             # batch loop
-            for word_idx in range((targets_ground_truth[0].size()[0])):     # words loop
-                ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
-                if length_matrix[sentence_idx][word_idx] == 1:
-                    if ground_truth_idx == targets_ground_truth[sentence_idx][word_idx]:
-                        if targets_ground_truth[sentence_idx][word_idx] == 0:  # take ['O'] 's value instead of zero
-                            loss -= torch.log(
-                                targets_scores[sentence_idx][word_idx][ground_truth_idx]
-                            )
-                        else:
-                            loss -= self.beta * torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
+    for sentence_idx in range((targets_ground_truth).size()[0]):             # batch loop
+        for word_idx in range((targets_ground_truth[0].size()[0])):     # words loop
+            ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
+            if length_matrix[sentence_idx][word_idx] == 1:
+                if ground_truth_idx == targets_ground_truth[sentence_idx][word_idx]:
+                    if targets_ground_truth[sentence_idx][word_idx] == 0:  # take ['O'] 's value instead of zero
+                        loss -= torch.log(
+                            targets_scores[sentence_idx][word_idx][ground_truth_idx]
+                        )
                     else:
-                        loss -= torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
-                        # ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
-                        # diff = 1 - targets_scores[sentence_idx][word_idx][ground_truth_idx]
+                        loss -= beta * torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
+                else:
+                    loss -= torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
+                    # ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
+                    # diff = 1 - targets_scores[sentence_idx][word_idx][ground_truth_idx]
 
-        return loss/size
+    return loss/size
+
+
+
+# class LossFunc(nn.Module):
+#     '''
+#     doc me!
+#     '''
+#     def __init__(self, beta):
+#         '''
+#         doc me!
+#         '''
+#         super(LossFunc, self).__init__()
+#         self.beta = beta
+#         return
+
+#     def forward(self, targets_scores, targets_ground_truth, y_ix_to_word, lengths):
+#         length_matrix = np.zeros((64, 188))
+#         for i in range(len(lengths)):
+#             for j in range(lengths[i]):
+#                 length_matrix[i][j] = 1
+
+#         loss = Variable(torch.zeros(1))
+#         max_index = torch.max(targets_scores, 2)[1]     # (64,188)
+#         a = targets_ground_truth
+#         a = a.numpy()
+#         size = len(a)
+
+#         for sentence_idx in range((targets_ground_truth).size()[0]):             # batch loop
+#             for word_idx in range((targets_ground_truth[0].size()[0])):     # words loop
+#                 ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
+#                 if length_matrix[sentence_idx][word_idx] == 1:
+#                     if ground_truth_idx == targets_ground_truth[sentence_idx][word_idx]:
+#                         if targets_ground_truth[sentence_idx][word_idx] == 0:  # take ['O'] 's value instead of zero
+#                             loss -= torch.log(
+#                                 targets_scores[sentence_idx][word_idx][ground_truth_idx]
+#                             )
+#                         else:
+#                             loss -= self.beta * torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
+#                     else:
+#                         loss -= torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
+#                         # ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
+#                         # diff = 1 - targets_scores[sentence_idx][word_idx][ground_truth_idx]
+
+#         return loss/size
 
 
 def accuracy_func(
         predict: Variable,
         ground_truth: LongTensor,
 ) -> float:
+    '''accuracy
+    '''
     total_num = len(torch.nonzero(ground_truth))
 
     ground_truth_modified = ground_truth.clone()
@@ -112,26 +152,6 @@ def accuracy_func(
     # a = a.numpy()
     # size = len(a)
     return hit_tags/total_num
-
-
-# class AccuracyFun(nn.Module):
-#     '''
-#     doc me!
-#     '''
-#     def __init__(self):
-#         super(AccuracyFun, self).__init__()
-#         return
-
-#     def forward(self, targets_scores, targets_ground_truth):
-#         total_tag_number = torch.nonzero(targets_ground_truth).size(0)
-#         targets_in_clone = targets_ground_truth.clone()
-#         targets_in_clone[targets_ground_truth==0] = 1     # two issue: 1 vs -1 & zero is for other???
-#         hit_tags = (torch.max(targets_scores, 2)[1].view(targets_ground_truth.size()) == targets_in_clone).sum()
-
-#         # a = targets_in.data
-#         # a = a.numpy()
-#         # size = len(a)
-#         return hit_tags/total_tag_number
 
 
 def predict(
@@ -188,8 +208,8 @@ def main(args: dict) -> int:
 #    )
 
     with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
-       word_index = pickle.load(vocab,encoding='latin1')
-       embedding_matrix = pickle.load(vocab,encoding='latin1')
+        word_index = pickle.load(vocab,encoding='latin1')
+        embedding_matrix = pickle.load(vocab,encoding='latin1')
 
     X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
         'data/train_test/train_x_real_filter.txt',
@@ -222,7 +242,7 @@ def main(args: dict) -> int:
     #     if param.requires_grad:
     #         print(name, param.data)
 
-    loss_function = LossFunc(beta=10)
+    # loss_function = LossFunc(beta=10)
     # accuracy_function = AccuracyFun()
 
     optimizer = optim.SGD(model.parameters(), lr=0.01)
@@ -241,7 +261,7 @@ def main(args: dict) -> int:
                 model,
                 input_length[i:i+BATCH_SIZE]
             )
-            loss = loss_function(tag_scores, targets_ground_truth, y_ix_to_word, input_length[i:i+BATCH_SIZE])
+            loss = loss_func(tag_scores, targets_ground_truth, y_ix_to_word, input_length[i:i+BATCH_SIZE])
             loss.backward()
             optimizer.step()
 
