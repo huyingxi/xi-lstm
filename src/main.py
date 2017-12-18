@@ -27,27 +27,6 @@ from xibase import (
     LSTMP,
 )
 
-ap = argparse.ArgumentParser()
-ap.add_argument('-max_len', type=int, default=200)
-ap.add_argument('-vocab_size', type=int, default=45000)
-ap.add_argument('-batch_size', type=int, default=64)
-ap.add_argument('-layer_num', type=int, default=1)
-ap.add_argument('-hidden_dim', type=int, default=300)
-ap.add_argument('-nb_epoch', type=int, default=5)
-ap.add_argument('-mode', default='train')
-ap.add_argument('-embed_dim', type=int, default=300)
-args = vars(ap.parse_args())
-
-MAX_LEN = args['max_len']
-VOCAB_SIZE = args['vocab_size']
-BATCH_SIZE = args['batch_size']
-LAYER_NUM = args['layer_num']
-HIDDEN_DIM = args['hidden_dim']
-NB_EPOCH = args['nb_epoch']
-MODE = args['mode']
-EMBED_DIM = args['embed_dim']
-
-
 def text_to_word_sequence(
         text,
         filters=' \t\n',
@@ -195,10 +174,7 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
             y[i].append(0)
             round -= 1
 
-    return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
-
-
-
+    return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, seq_lengths)
 
 
 class RNNModel(nn.Module):
@@ -408,7 +384,6 @@ class LossFunc(nn.Module):
         return loss/size
 
 
-
 class AccuracyFun(nn.Module):
     '''
     doc me!
@@ -447,10 +422,18 @@ def predict(X, y, model, lengths):
     return tag_scores, targets_in
 
 
-def run():
-    '''
-    doc me!
-    '''
+def main(args):
+    ''' Main entrypoint '''
+
+    MAX_LEN = args.max_len
+    VOCAB_SIZE = args.vocab_size
+    BATCH_SIZE = args.batch_size
+    LAYER_NUM = args.layer_num
+    HIDDEN_DIM = args.hidden_dim
+    NB_EPOCH = args.nb_epoch
+    MODE = args.mode
+    EMBED_DIM = args.embed_dim
+
 #    X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data_old(
 #        'data/train_test/train_x_real_filter.txt',
 #        'data/train_test/train_y_real_filter.txt',
@@ -485,6 +468,7 @@ def run():
         len(y_word_to_ix),
         embedding_matrix_new,
     )
+
     print(model)
 
     for name, param in model.named_parameters():
@@ -584,4 +568,24 @@ def run():
     log.close()
 
 
-run()
+def parse_arguments(argv):
+    """ args """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-max_len', type=int, default=200,
+        help='max_len help message'
+    )
+    parser.add_argument('-vocab_size', type=int, default=45000)
+    parser.add_argument('-batch_size', type=int, default=64)
+    parser.add_argument('-layer_num', type=int, default=1)
+    parser.add_argument('-hidden_dim', type=int, default=300)
+    parser.add_argument('-nb_epoch', type=int, default=5)
+    parser.add_argument('-mode', default='train')
+    parser.add_argument('-embed_dim', type=int, default=300)
+
+    return parser.parse_args(argv)
+
+
+if __name__ == '__main__':
+    main(parse_arguments(sys.argv[1:]))

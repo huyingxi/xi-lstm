@@ -231,7 +231,7 @@ class AccuracyFun(nn.Module):
     def forward(self, targets_scores, targets_in):
         acc = (torch.max(targets_scores, 2)[1].view(targets_in.size()).data == targets_in.data).sum()
         a = targets_in.data
-        a = a.numpy()
+        a = a.cpu().numpy()
         size = len(a)
         return acc/size
 
@@ -298,7 +298,7 @@ def run():
 
     # loss_function = nn.NLLLoss()
     loss_function = LossFunc(beta=10)
-    # accuracy_function = AccuracyFun()
+    accuracy_function = AccuracyFun()
 
     optimizer = optim.SGD(model.parameters(), lr=0.01)
     # optimizer = optim.Adam(model.parameters(), lr=0.0001)
@@ -318,7 +318,7 @@ def run():
         print("epoch : ", epoch)
         for i in range(len(X) - BATCH_SIZE):
             print("batch : ", i)
-            # optimizer.zero_grad()
+            optimizer.zero_grad()
             tag_scores, targets_in = predict(
                 X[i:i+BATCH_SIZE],
                 y[i:i+BATCH_SIZE],
@@ -335,6 +335,8 @@ def run():
             optimizer.step()
 
             print("current loss : ", loss.data)
+            acc = accuracy_function(tag_scores, targets_in)
+            print('accuracy : ', acc)
 
 
 run()
