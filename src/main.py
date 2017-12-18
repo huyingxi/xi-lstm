@@ -162,10 +162,18 @@ def main(args: dict) -> int:
     # again, normally you would NOT do 300 epochs, it is toy data
     for epoch in range(NB_EPOCH):
         for i in range(0, (len(X) - 2*BATCH_SIZE), BATCH_SIZE):
-            print("epoch[{}] batch[{}/{}] ".format(epoch, int(i/BATCH_SIZE), int(len(X)/BATCH_SIZE)),  end='')
+            print("epoch[{}] batch[{}/{}] ".format(
+                epoch,
+                int(i/BATCH_SIZE),
+                int(len(X)/BATCH_SIZE),
+                ),
+                  end='',
+                 )
             optimizer.zero_grad()
 
-            targets_ground_truth = torch.from_numpy(np.asarray(y[i:i+BATCH_SIZE]))
+            targets_ground_truth = torch.from_numpy(
+                np.asarray(y[i:i+BATCH_SIZE])
+            )
 
             tag_scores = predict(
                 X[i:i+BATCH_SIZE],
@@ -173,7 +181,13 @@ def main(args: dict) -> int:
                 input_length[i:i+BATCH_SIZE]
             )
 
-            loss = loss_func(tag_scores, targets_ground_truth, y_ix_to_word, input_length[i:i+BATCH_SIZE])
+            loss = loss_func(
+                tag_scores,
+                targets_ground_truth,
+                y_ix_to_word,
+                input_length[i:i+BATCH_SIZE],
+            )
+
             loss.backward()
             optimizer.step()
 
@@ -181,7 +195,8 @@ def main(args: dict) -> int:
             # print(type(targets_ground_truth))
 
             acc = accuracy_func(tag_scores, targets_ground_truth)
-            print("current loss[%4.2f] / accuracy:[%4.2f]" % (loss.data[0], acc))
+            print("current loss[%4.2f] / accuracy:[%4.2f]"
+                  % (loss.data[0], acc))
     log.close()
 
     return 0
