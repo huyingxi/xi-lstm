@@ -2,30 +2,22 @@
 lstmp for xi
 '''
 import argparse
-# import ipdb
-import inspect
-import os
 import sys
-import string
-
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn._functions.rnn as rnn
-from torch.autograd import Variable
-import torch.autograd as autograd
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.nn import Parameter
-from torch.autograd import Function
-from torch import (
-    LongTensor,
-)
-
 from typing import (
     Any,
     List,
     Tuple,
+)
+
+import numpy as np
+
+import torch
+from torch import (
+    LongTensor,
+    optim,
+)
+from torch.autograd import (
+    Variable,
 )
 
 from data_loader import (
@@ -97,28 +89,28 @@ def accuracy_func(
 
 
 def predict(
-        X: List,
+        X: Variable,
         model: LSTMTagger,
         lengths: List[int],
-) -> Tuple[Any, Any]:
+) -> Any:
     ''' predict
     '''
     # model.zero_grad()
     # no need to use Variable here. DELETE it.
     #
     # sentence = Variable(torch.zeros((len(X), 188)), requires_grad=False).long()
-    sentence = torch.zeros((len(X), 188)).long()
+    # sentence = torch.zeros((len(X), 188)).long()
     # sentence1 = torch.zeros((len(X), 188)).long()
 
-    for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
-        sentence[idx, :seqlen] = torch.LongTensor(seq)
+    # for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
+    #     sentence[idx, :seqlen] = torch.LongTensor(seq)
 
-    lengths = torch.LongTensor(lengths)
-    lengths, perm_idx = lengths.sort(0, descending=True)
-    sentence = sentence[perm_idx]
+    # lengths = torch.LongTensor(lengths)
+    # lengths, perm_idx = lengths.sort(0, descending=True)
+    # sentence = sentence[perm_idx]
 
-    sentence = Variable(sentence, requires_grad=False)
-    tag_scores = model(sentence, lengths)
+    # sentence = Variable(sentence, requires_grad=False)
+    tag_scores = model(X, lengths)
 
     return tag_scores
 
@@ -135,15 +127,8 @@ def main(args: dict) -> int:
     MODE = args.mode
     EMBED_DIM = args.embed_dim
 
-    X, X_word_to_idx, X_ix_to_word, y, y_word_to_idx, y_ix_to_word, embedding_weight, input_length = load_train_test_data(
-        'data/train_test/train_x_real_filter.txt',
-        'data/train_test/train_y_real_filter.txt',
-        max_len=188,
-    )
-
-    # embedding_matrix_new = []
-    # for i in embedding_matrix:
-    #     embedding_matrix_new.append(i)
+    X, X_word_to_idx, X_ix_to_word, y, y_word_to_idx, y_ix_to_word, \
+        embedding_weight, input_length = load_train_test_data()
 
     # import ipdb; ipdb.set_trace()
     c = list(zip(X, y, input_length))
@@ -158,14 +143,17 @@ def main(args: dict) -> int:
         embedding_weight,
     )
 
+    sentence = torch.zeros((len(X), 188)).long()
+    for idx, (seq, seqlen) in enumerate(zip(X, input_length)):
+        sentence[idx, :seqlen] = torch.LongTensor(seq)
+    sentence = Variable(sentence, requires_grad=False)
+    X = sentence
+
     # print(model)
 
     # for name, param in model.named_parameters():
     #     if param.requires_grad:
     #         print(name, param.data)
-
-    # loss_function = LossFunc(beta=10)
-    # accuracy_function = AccuracyFun()
 
     optimizer = optim.SGD(model.parameters(), lr=0.01)
 
@@ -173,9 +161,8 @@ def main(args: dict) -> int:
 
     # again, normally you would NOT do 300 epochs, it is toy data
     for epoch in range(NB_EPOCH):
-        print("epoch : ", epoch)
         for i in range(0, (len(X) - 2*BATCH_SIZE), BATCH_SIZE):
-            print("batch {0}, total_batch {1}: ".format(int(i/BATCH_SIZE), int(len(X)/BATCH_SIZE)))
+            print("epoch[{}] batch[{}/{}] ".format(epoch, int(i/BATCH_SIZE), int(len(X)/BATCH_SIZE)),  end='')
             optimizer.zero_grad()
 
             targets_ground_truth = torch.from_numpy(np.asarray(y[i:i+BATCH_SIZE]))
@@ -190,13 +177,11 @@ def main(args: dict) -> int:
             loss.backward()
             optimizer.step()
 
-            print("current loss : ", loss.data)
-
             # print(type(tag_scores))
             # print(type(targets_ground_truth))
 
             acc = accuracy_func(tag_scores, targets_ground_truth)
-            print('accuracy : ', acc)
+            print("current loss[%4.2f] / accuracy:[%4.2f]" % (loss.data[0], acc))
     log.close()
 
     return 0

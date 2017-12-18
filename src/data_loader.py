@@ -88,31 +88,29 @@ def load_data_old(source, dist, max_len, vocab_size):
     )
 
 
-def load_train_test_data(
-        source: str,
-        dist: str,
-        max_len: int,
-):
+def load_train_test_data():
     '''
     doc me!
     '''
+    MAX_LEN = 188
+
     with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
         word_index = pickle.load(vocab, encoding='latin1')
         embedding_weight = pickle.load(vocab, encoding='latin1')
 
-    f = open(source, 'r')
+    f = open('data/train_test/train_x_real_filter.txt', 'r')
     X_data = f.read()
     f.close()
-    f = open(dist, 'r')
+    f = open('data/train_test/train_y_real_filter.txt', 'r')
     y_data = f.read()
     f.close()
 
     # Splitting raw text into array of sequences
     X = [[i for i in (x.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
+         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= MAX_LEN and len(y.split(' ')) <= MAX_LEN]
     X_max = max(map(len,X))
     y = [[j for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
+        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= MAX_LEN and len(y.split(' ')) <= MAX_LEN]
 
     # UNKNOWN
     word_index['UNK'] = len(word_index)
