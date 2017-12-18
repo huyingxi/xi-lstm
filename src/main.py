@@ -3,6 +3,7 @@ lstmp for xi
 '''
 import argparse
 # import ipdb
+import inspect
 import os
 import pickle
 import sys
@@ -18,6 +19,15 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn import Parameter
 from torch.autograd import Function
+from torch import (
+    LongTensor,
+)
+
+from typing import (
+    Any,
+    List,
+    Tuple,
+)
 
 from data_loader import (
     load_data,
@@ -64,7 +74,7 @@ class LossFunc(nn.Module):
 
         loss = Variable(torch.zeros(1))
         max_index = torch.max(targets_scores, 2)[1]     # (64,188)
-        a = targets_ground_truth.data
+        a = targets_ground_truth
         a = a.numpy()
         size = len(a)
 
@@ -72,14 +82,8 @@ class LossFunc(nn.Module):
             for word_idx in range((targets_ground_truth[0].size()[0])):     # words loop
                 ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
                 if length_matrix[sentence_idx][word_idx] == 1:
-                    if torch.equal(
-                        ground_truth_idx,
-                        targets_ground_truth[sentence_idx][word_idx]
-                    ):
-                        if torch.equal(
-                            targets_ground_truth[sentence_idx][word_idx].data,
-                            torch.LongTensor(1).zero_()  # take ['O'] 's value instead of zero
-                        ):
+                    if ground_truth_idx == targets_ground_truth[sentence_idx][word_idx]:
+                        if targets_ground_truth[sentence_idx][word_idx] == 0:  # take ['O'] 's value instead of zero
                             loss -= torch.log(
                                 targets_scores[sentence_idx][word_idx][ground_truth_idx]
                             )
@@ -93,47 +97,78 @@ class LossFunc(nn.Module):
         return loss/size
 
 
-class AccuracyFun(nn.Module):
+def accuracy_func(
+        predict: Variable,
+        ground_truth: LongTensor,
+) -> float:
+    total_num = len(torch.nonzero(ground_truth))
+
+    ground_truth_modified = ground_truth.clone()
+    ground_truth_modified[ground_truth == 0] = 1
+
+    hit_tags = (torch.max(predict, 2)[1].view(ground_truth.size()).data == ground_truth_modified).sum()
+
+    # a = targets_in.data
+    # a = a.numpy()
+    # size = len(a)
+    return hit_tags/total_num
+
+
+# class AccuracyFun(nn.Module):
+#     '''
+#     doc me!
+#     '''
+#     def __init__(self):
+#         super(AccuracyFun, self).__init__()
+#         return
+
+#     def forward(self, targets_scores, targets_ground_truth):
+#         total_tag_number = torch.nonzero(targets_ground_truth).size(0)
+#         targets_in_clone = targets_ground_truth.clone()
+#         targets_in_clone[targets_ground_truth==0] = 1     # two issue: 1 vs -1 & zero is for other???
+#         hit_tags = (torch.max(targets_scores, 2)[1].view(targets_ground_truth.size()) == targets_in_clone).sum()
+
+#         # a = targets_in.data
+#         # a = a.numpy()
+#         # size = len(a)
+#         return hit_tags/total_tag_number
+
+
+def predict(
+        X: List,
+        y: List,
+        model: LSTMTagger,
+        lengths: List[int],
+) -> Tuple[Any, Any]:
+    ''' predict
     '''
-    doc me!
-    '''
-    def __init__(self):
-        super(AccuracyFun, self).__init__()
-        return
-
-    def forward(self, targets_scores, targets_in):
-        total_tag_number = torch.nonzero(targets_in).size(0)
-        targets_in_clone = targets_in.clone()
-        targets_in_clone[targets_in==0] = 1     # two issue: 1 vs -1 & zero is for other???
-        hit_tags = (torch.max(targets_scores, 2)[1].view(targets_in.size()).data == targets_in_clone.data).sum()
-
-        # a = targets_in.data
-        # a = a.numpy()
-        # size = len(a)
-        return hit_tags/total_tag_number
-
-
-def predict(X, y, model, lengths):
     # model.zero_grad()
     # no need to use Variable here. DELETE it.
     #
-    sentence = Variable(torch.zeros((len(X), 188)), requires_grad=False).long()
+    # sentence = Variable(torch.zeros((len(X), 188)), requires_grad=False).long()
+    sentence = torch.zeros((len(X), 188)).long()
+    # sentence1 = torch.zeros((len(X), 188)).long()
+
     for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
         sentence[idx, :seqlen] = torch.LongTensor(seq)
+
     lengths = torch.LongTensor(lengths)
     lengths, perm_idx = lengths.sort(0, descending=True)
     sentence = sentence[perm_idx]
 
+    sentence = Variable(sentence, requires_grad=False)
     tag_scores = model(sentence, lengths)
 
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
-    targets_ground_truth = Variable(targets, requires_grad=False)     # delete it if possible
+
+    # targets_ground_truth = Variable(targets, requires_grad=False)     # delete it if possible
+    targets_ground_truth = targets     # delete it if possible
 
     return tag_scores, targets_ground_truth
 
 
-def main(args):
+def main(args: dict) -> int:
     ''' Main entrypoint '''
 
     MAX_LEN = args.max_len
@@ -168,9 +203,10 @@ def main(args):
     for i in embedding_matrix:
         embedding_matrix_new.append(i)
 
+    # import ipdb; ipdb.set_trace()
     c = list(zip(X, y, input_length))
     np.random.shuffle(c)
-    X[:], y[:], input_length = zip(*c)
+    X[:], y[:], input_length[:] = zip(*c)
 
     model = LSTMTagger(
         EMBED_DIM,
@@ -180,62 +216,16 @@ def main(args):
         embedding_matrix_new,
     )
 
-    print(model)
+    # print(model)
 
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(name, param.data)
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name, param.data)
 
-    # loss_function = nn.NLLLoss()
     loss_function = LossFunc(beta=10)
-    accuracy_function = AccuracyFun()
+    # accuracy_function = AccuracyFun()
 
     optimizer = optim.SGD(model.parameters(), lr=0.01)
-
-    # optimizer = optim.RMSprop(
-    #     model.parameters(),
-    #     lr=0.1,
-    #     alpha=0.99,
-    #     eps=1e-08,
-    #     weight_decay=0,
-    #     momentum=0,
-    #     centered=False,
-    # )
-
-#    f = open('data/train_test/train_x_real_filter.txt', 'r')
-#    f1 = open('data/train_test/train_y_real_filter.txt', 'r')
-#    X_test_data = f.read()
-#    Y_test_data = f1.read()
-#    f.close()
-#    f1.close()
-#    test_x = [text_to_word_sequence(x_)[::-1] for x_ in X_test_data.split('\n') if
-#             len(x_.split(' ')) > 0 and len(x_.split(' ')) <= MAX_LEN]
-#    test_y = [text_to_word_sequence(y_)[::-1] for y_ in Y_test_data.split('\n') if
-#             len(y_.split(' ')) > 0 and len(y_.split(' ')) <= MAX_LEN]
-#
-#    X_max_test = max(map(len, test_x))
-#    for index in range(len(test_x)):
-#        round = X_max_test - len(test_x[index])
-#        while round:
-#            test_x[index].append('.')
-#            test_y[index].append('O')
-#            round -= 1
-#
-#    for i, sentence in enumerate(test_x):
-#        for j, word in enumerate(sentence):
-#            if word in X_word_to_ix:
-#                test_x[i][j] = X_word_to_ix[word]
-#            else:
-#                test_x[i][j] = X_word_to_ix['UNK']
-#
-#    for i, sentence in enumerate(test_y):
-#        for j, word in enumerate(sentence):
-#            if word in y_word_to_ix:
-#                test_y[i][j] = y_word_to_ix[word]
-#            else:
-#                test_y[i][j] = y_word_to_ix['UNK']
-
-    count = 0
 
     log = open('data/log.txt', 'w')
 
@@ -257,26 +247,14 @@ def main(args):
 
             print("current loss : ", loss.data)
 
-            acc = accuracy_function(tag_scores, targets_ground_truth)
+            print(type(tag_scores))
+            print(type(targets_ground_truth))
+
+            acc = accuracy_func(tag_scores, targets_ground_truth)
             print('accuracy : ', acc)
-            # p1 = list(model.parameters())[0].clone()
-            # optimizer.step()
-            # p2 = list(model.parameters())[0].clone()
-            # print(torch.equal(p1,p2))
-#            if count % 100 == 0:
-#                # torch.save(model, '/Users/test/Desktop/RE/model')
-#                print("{0} epoch , current training loss {1} : ".format(epoch, loss.data))
-#                log.write(str(epoch) + "epoch" + "current trainning loss : " + str(loss.data))
-#                test_scores, test_targets = predict(
-#                    test_x[0:BATCH_SIZE],
-#                    test_y[0:BATCH_SIZE],
-#                    model,
-#                )
-#                loss_test = loss_function(test_scores, test_targets)
-#                print(".............current test loss............ {} : ".format(loss_test/BATCH_SIZE))
-#                log.write("current test loss : " + str(loss_test/BATCH_SIZE))
-#            count += 1
     log.close()
+
+    return 0
 
 
 def parse_arguments(argv):
@@ -299,4 +277,10 @@ def parse_arguments(argv):
 
 
 if __name__ == '__main__':
-    main(parse_arguments(sys.argv[1:]))
+    sys.exit(
+        main(
+            parse_arguments(
+                sys.argv[1:]
+            )
+        )
+    )

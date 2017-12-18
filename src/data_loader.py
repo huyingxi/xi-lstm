@@ -103,8 +103,8 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
     word_index['UNK'] = len(word_index)
 
     b = np.random.rand(1, 300)
-    print(type(embedding_weight))
-    print(len(b))
+    # print(type(embedding_weight))
+    # print(len(b))
     np.append(embedding_weight, b, axis=0)
     index_word = {word: ix for ix, word in enumerate(word_index)}
 
@@ -125,8 +125,7 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
             if word in y_word_to_ix:
                 y[i][j] = y_word_to_ix[word]
 
-    seq_lengths = []
-    seq_lengths = (map(len, X))
+    seq_lengths = list(map(len, X))
 
     for i, sentence in enumerate(X):
         round = X_max - len(X[i])
@@ -135,5 +134,10 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
             y[i].append(0)
             round -= 1
 
-    import ipdb; ipdb.set_trace()
-    return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, seq_lengths)
+    # import ipdb; ipdb.set_trace()
+    return (
+        X, word_index, index_word,
+        y, y_word_to_ix, y_ix_to_word,
+        embedding_weight,
+        seq_lengths,
+    )

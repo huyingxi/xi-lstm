@@ -1,9 +1,21 @@
 '''
 module doc
 '''
+from typing import (
+    Any,
+    List,
+    # Tuple,
+)
+
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import (
+    nn,
+    # LongTensor,
+)
+from torch.autograd import (
+    Variable,
+)
 import torch.nn.functional as F
 
 from rnn_model_p import (
@@ -62,10 +74,11 @@ class LSTMTagger(nn.Module):
         self.hidden2tag = nn.Linear(2*hidden_dim, tagset_size, bias=True)
         self.softmax = nn.Softmax()
 
-    def forward(self, sentence, lengths):
-        '''
-        doc me!
-        '''
+    def forward(
+            self,
+            sentence: Variable,
+            lengths: List[int],
+    ) -> Any:
         embeds = self.word_embeddings(sentence)
         embeds = self.dropout(embeds)
         embeds = self.lstmp(embeds, lengths)[0]
