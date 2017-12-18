@@ -1,3 +1,10 @@
+from typing import (
+    Any,
+    List,
+    Tuple,
+)
+import pickle
+
 from gensim.models import word2vec
 from nltk import FreqDist
 import numpy as np
@@ -81,10 +88,18 @@ def load_data_old(source, dist, max_len, vocab_size):
     )
 
 
-def load_data(source, dist, word_index, embedding_weight, max_len):
+def load_train_test_data(
+        source: str,
+        dist: str,
+        max_len: int,
+):
     '''
     doc me!
     '''
+    with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
+        word_index = pickle.load(vocab, encoding='latin1')
+        embedding_weight = pickle.load(vocab, encoding='latin1')
+
     f = open(source, 'r')
     X_data = f.read()
     f.close()

@@ -5,7 +5,6 @@ import argparse
 # import ipdb
 import inspect
 import os
-import pickle
 import sys
 import string
 
@@ -30,7 +29,7 @@ from typing import (
 )
 
 from data_loader import (
-    load_data,
+    load_train_test_data,
 )
 
 from tagger import (
@@ -136,22 +135,9 @@ def main(args: dict) -> int:
     MODE = args.mode
     EMBED_DIM = args.embed_dim
 
-#    X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, word_embed_weight = load_data_old(
-#        'data/train_test/train_x_real_filter.txt',
-#        'data/train_test/train_y_real_filter.txt',
-#        MAX_LEN,
-#        VOCAB_SIZE,
-#    )
-
-    with open('data/word2vec_google300_for_NYT.pkl', 'rb') as vocab:
-        word_index = pickle.load(vocab,encoding='latin1')
-        embedding_matrix = pickle.load(vocab,encoding='latin1')
-
-    X, X_word_to_ix, X_ix_to_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, input_length = load_data(
+    X, X_word_to_idx, X_ix_to_word, y, y_word_to_idx, y_ix_to_word, embedding_weight, input_length = load_train_test_data(
         'data/train_test/train_x_real_filter.txt',
         'data/train_test/train_y_real_filter.txt',
-        word_index,
-        embedding_matrix,
         max_len=188,
     )
 
@@ -167,9 +153,9 @@ def main(args: dict) -> int:
     model = LSTMTagger(
         EMBED_DIM,
         HIDDEN_DIM,
-        len(X_word_to_ix),
-        len(y_word_to_ix),
-        embedding_matrix,
+        len(X_word_to_idx),
+        len(y_word_to_idx),
+        embedding_weight,
     )
 
     # print(model)
@@ -206,8 +192,8 @@ def main(args: dict) -> int:
 
             print("current loss : ", loss.data)
 
-            print(type(tag_scores))
-            print(type(targets_ground_truth))
+            # print(type(tag_scores))
+            # print(type(targets_ground_truth))
 
             acc = accuracy_func(tag_scores, targets_ground_truth)
             print('accuracy : ', acc)
