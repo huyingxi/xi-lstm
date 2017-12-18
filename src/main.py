@@ -8,7 +8,6 @@ import pickle
 import sys
 import string
 
-from nltk import FreqDist
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,12 +19,14 @@ import torch.optim as optim
 from torch.nn import Parameter
 from torch.autograd import Function
 
-from gensim.models import word2vec
-
-from xibase import (
-    LSTMO,
-    LSTMP,
+from data_loader import (
+    load_data,
 )
+
+from tagger import (
+    LSTMTagger,
+)
+
 
 def text_to_word_sequence(
         text,
@@ -43,301 +44,6 @@ def text_to_word_sequence(
     return [i for i in seq if i]
 
 
-def load_data_old(source, dist, max_len, vocab_size):
-    '''
-    doc me!
-    '''
-    f = open(source, 'r')
-    X_data = f.read()
-    f.close()
-    f = open(dist, 'r')
-    y_data = f.read()
-    f.close()
-
-    # Splitting raw text into array of sequences
-    X = [[i for i in x.split(' ')] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-    X_max = max(map(len,X))
-
-    y = [[j for j in y.split(' ')] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-
-    for index in range(len(X)):
-        round = X_max - len(X[index])
-        while(round):
-            X[index].append('.')
-            y[index].append('O')
-            round -= 1
-
-    model = word2vec.Word2Vec.load('data/word2vec/mode.bin')
-
-    words = list(model.wv.vocab)
-    X_ix_to_word = words
-    X_ix_to_word.append('UNK')
-    X_word_to_ix = {word: ix for ix, word in enumerate(X_ix_to_word)}
-
-    weight = []
-    for i in range(len(X_ix_to_word)):
-        if X_ix_to_word[i] in model.wv.vocab:
-            weight_item = model[X_ix_to_word[i]].tolist()
-            weight.append(weight_item)
-        else:
-            weight.append(np.random.randn(300, ).tolist())
-    dist = FreqDist(np.hstack(y))
-    y_vocab = dist.most_common(vocab_size - 1)
-
-    count_in = 0
-    count_out = 0
-    for i, sentence in enumerate(X):
-        for j, word in enumerate(sentence):
-
-            if word in X_word_to_ix:
-                count_in += 1
-                X[i][j] = X_word_to_ix[word]
-            else:
-                count_out += 1
-                X[i][j] = X_word_to_ix['UNK']
-
-    y_ix_to_word = [word[0] for word in y_vocab]
-    y_ix_to_word.append('UNK')
-    y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
-    count_in = 0
-    count_out = 0
-    for i, sentence in enumerate(y):
-        for j, word in enumerate(sentence):
-            if word in y_word_to_ix:
-                count_in += 1
-                y[i][j] = y_word_to_ix[word]
-            else:
-                count_out += 1
-                y[i][j] = y_word_to_ix['UNK']
-
-    return (
-        X,
-        len(X_word_to_ix), X_word_to_ix, X_ix_to_word,
-        y,
-        len(y_word_to_ix), y_word_to_ix, y_ix_to_word,
-        weight,
-    )
-
-
-def load_data(source, dist, word_index, embedding_weight, max_len):
-    '''
-    doc me!
-    '''
-    f = open(source, 'r')
-    X_data = f.read()
-    f.close()
-    f = open(dist, 'r')
-    y_data = f.read()
-    f.close()
-
-    # Splitting raw text into array of sequences
-    X = [[i for i in (x.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-         len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-    X_max = max(map(len,X))
-    y = [[j for j in (y.split(' '))] for x, y in zip(X_data.split('\n'), y_data.split('\n')) if
-        len(x) > 0 and len(y) > 0 and len(x.split(' ')) <= max_len and len(y.split(' ')) <= max_len]
-
-    word_index['UNK'] = len(word_index)
-
-    b = np.random.rand(1, 300)
-    print(type(embedding_weight))
-    print(len(b))
-    np.append(embedding_weight, b, axis=0)
-    index_word = {word: ix for ix, word in enumerate(word_index)}
-
-    for i, sentence in enumerate(X):
-        for j, word in enumerate(sentence):
-            if word in word_index:
-                X[i][j] = word_index[word]
-            else:
-                X[i][j] = word_index['UNK']
-
-
-    dist = FreqDist(np.hstack(y))
-    y_vocab = dist.most_common()
-    y_ix_to_word = [word[0] for word in y_vocab]
-    y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
-    for i, sentence in enumerate(y):
-        for j, word in enumerate(sentence):
-            if word in y_word_to_ix:
-                y[i][j] = y_word_to_ix[word]
-
-    seq_lengths = []
-    seq_lengths = (map(len, X))
-
-    for i, sentence in enumerate(X):
-        round = X_max - len(X[i])
-        while(round):
-            # X[i].append(0)
-            y[i].append(0)
-            round -= 1
-
-    return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight, seq_lengths)
-
-
-class RNNModel(nn.Module):
-    '''
-    doc me!
-    '''
-    def __init__(
-            self,
-            input_size,
-            hidden_size,
-            recurrent_size,
-            num_layers,
-            num_classes,
-            return_sequences=True,
-            bias=True,
-            grad_clip=None,
-            bidirectional=True
-    ):
-        super(RNNModel, self).__init__()
-        self.hidden_size = hidden_size
-        self.recurrent_size = recurrent_size
-        self.num_layers = num_layers
-        self.return_sequences = return_sequences
-        self.bidirectional = bidirectional
-        self.num_directions = 2 if bidirectional else 1
-
-        self.rnn = LSTMP(input_size, hidden_size, recurrent_size, num_layers=num_layers, bias=bias, return_sequences=return_sequences, grad_clip=grad_clip, bidirectional=bidirectional)
-        # self.fc = nn.Linear(recurrent_size, num_classes, bias=bias)
-
-    def forward(self, x, lengths):
-        # Set initial states
-        zeros_h = Variable(torch.zeros(64, self.recurrent_size))
-        zeros_c = Variable(torch.zeros(64, self.hidden_size))
-        initial_states = [[(zeros_h, zeros_c)] * self.num_layers] * self.num_directions
-
-        # Forward propagate RNN
-        out = self.rnn(x, initial_states, lengths)
-        # out, _ = self.rnn(x, initial_states=None)
-
-        # Decode hidden state of last time step
-        # out = self.fc(out)
-        return out
-
-
-class RNNModel_O(nn.Module):
-    '''
-    doc me!
-    '''
-    def __init__(
-            self,
-            input_size,
-            hidden_size,
-            recurrent_size,
-            num_layers,
-            num_classes,
-            return_sequences=True,
-            bias=True,
-            grad_clip=None,
-            bidirectional=False,
-    ):
-        super(RNNModel_O, self).__init__()
-        self.hidden_size = hidden_size
-        self.recurrent_size = recurrent_size
-        self.num_layers = num_layers
-        self.return_sequences = return_sequences
-        self.bidirectional = bidirectional
-
-        self.rnn = LSTMO(
-            input_size,
-            hidden_size,
-            recurrent_size,
-            num_layers=num_layers,
-            bias=bias,
-            return_sequences=return_sequences,
-            grad_clip=grad_clip,
-            bidirectional=bidirectional,
-        )
-        self.num_directions = 2 if bidirectional else 1
-        # self.fc = nn.Linear(recurrent_size, num_classes, bias=bias)
-
-    def forward(self, x, lengths):
-        '''
-        doc me!
-        '''
-        # Set initial states
-        zeros_h = Variable(torch.zeros(x.size(0), self.recurrent_size))
-        zeros_c = Variable(torch.zeros(x.size(0), self.hidden_size))
-        zeros_t = Variable(torch.zeros(x.size(0), self.hidden_size))
-        initial_states = \
-            [[(zeros_h, zeros_c, zeros_t)] * self.num_layers] \
-            * self.num_directions
-
-        # Forward propagate RNN
-        out = self.rnn(x, initial_states, lengths)
-        # out, _ = self.rnn(x, initial_states=None)
-
-        # Decode hidden state of last time step
-        # out = self.fc(out)
-        return out
-
-
-class LSTMTagger(nn.Module):
-    '''
-    doc me!
-    '''
-    def __init__(
-            self,
-            embedding_dim,
-            hidden_dim,
-            vocab_size,
-            tagset_size,
-            word_embed_weight,
-    ):
-        super(LSTMTagger, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
-
-        # ipdb.set_trace()
-        np_weight = np.array(word_embed_weight)
-        weight = torch.from_numpy(np_weight)
-        self.word_embeddings.weight.data.copy_(weight)
-
-        self.dropout = torch.nn.Dropout(0.5)
-
-        self.lstmp = RNNModel(
-            input_size=embedding_dim,
-            hidden_size=hidden_dim,
-            recurrent_size=hidden_dim,
-            num_layers=1,
-            num_classes=106,
-            return_sequences=True,
-            bias=True,
-            grad_clip=10,
-            bidirectional=True,
-        )
-        self.lstmo = RNNModel_O(
-            input_size=2*hidden_dim,
-            hidden_size=2*hidden_dim,
-            recurrent_size=2*hidden_dim,
-            num_layers=1,
-            num_classes=106,
-            return_sequences=True,
-            bias=True,
-            grad_clip=10,
-            bidirectional=False,
-        )
-        self.hidden2tag = nn.Linear(2*hidden_dim, tagset_size, bias=True)
-        self.softmax = nn.Softmax()
-
-    def forward(self, sentence, lengths):
-        '''
-        doc me!
-        '''
-        embeds = self.word_embeddings(sentence)
-        embeds = self.dropout(embeds)
-        embeds = self.lstmp(embeds, lengths)[0]
-        embeds = self.lstmo(embeds, lengths)[2]
-        tag_space = self.hidden2tag(embeds)
-        tag_scores = F.softmax(tag_space, dim=-1)
-
-        return tag_scores
-
-
 class LossFunc(nn.Module):
     '''
     doc me!
@@ -350,36 +56,39 @@ class LossFunc(nn.Module):
         self.beta = beta
         return
 
-    def forward(self, targets_scores, targets_in, y_ix_to_word, lengths):
-        length_matrix = np.zeros((64,188))
+    def forward(self, targets_scores, targets_ground_truth, y_ix_to_word, lengths):
+        length_matrix = np.zeros((64, 188))
         for i in range(len(lengths)):
             for j in range(lengths[i]):
                 length_matrix[i][j] = 1
 
         loss = Variable(torch.zeros(1))
         max_index = torch.max(targets_scores, 2)[1]     # (64,188)
-        a = targets_in.data
+        a = targets_ground_truth.data
         a = a.numpy()
         size = len(a)
 
-        for batch in range((targets_in).size()[0]):             # batch loop
-            for length in range((targets_in[0].size()[0])):     # words loop
-                if length_matrix[batch][length] == 1:
+        for sentence_idx in range((targets_ground_truth).size()[0]):             # batch loop
+            for word_idx in range((targets_ground_truth[0].size()[0])):     # words loop
+                ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
+                if length_matrix[sentence_idx][word_idx] == 1:
                     if torch.equal(
-                        max_index[batch][length],
-                        targets_in[batch][length]
+                        ground_truth_idx,
+                        targets_ground_truth[sentence_idx][word_idx]
                     ):
                         if torch.equal(
-                            targets_in[batch][length].data,
-                            torch.LongTensor(1).zero_()
+                            targets_ground_truth[sentence_idx][word_idx].data,
+                            torch.LongTensor(1).zero_()  # take ['O'] 's value instead of zero
                         ):
                             loss -= torch.log(
-                                targets_scores[batch][length][max_index[batch][length]]
+                                targets_scores[sentence_idx][word_idx][ground_truth_idx]
                             )
                         else:
-                            loss -= self.beta * torch.log(targets_scores[batch][length][max_index[batch][length]])
+                            loss -= self.beta * torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
                     else:
-                        loss -= torch.log(targets_scores[batch][length][targets_in[batch][length]])
+                        loss -= torch.log(targets_scores[sentence_idx][word_idx][ground_truth_idx])
+                        # ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]
+                        # diff = 1 - targets_scores[sentence_idx][word_idx][ground_truth_idx]
 
         return loss/size
 
@@ -395,7 +104,7 @@ class AccuracyFun(nn.Module):
     def forward(self, targets_scores, targets_in):
         total_tag_number = torch.nonzero(targets_in).size(0)
         targets_in_clone = targets_in.clone()
-        targets_in_clone[targets_in==0] = 1
+        targets_in_clone[targets_in==0] = 1     # two issue: 1 vs -1 & zero is for other???
         hit_tags = (torch.max(targets_scores, 2)[1].view(targets_in.size()).data == targets_in_clone.data).sum()
 
         # a = targets_in.data
@@ -405,21 +114,23 @@ class AccuracyFun(nn.Module):
 
 
 def predict(X, y, model, lengths):
-    model.zero_grad()
-    sentence_in = Variable(torch.zeros((len(X),188))).long()
+    # model.zero_grad()
+    # no need to use Variable here. DELETE it.
+    #
+    sentence = Variable(torch.zeros((len(X), 188)), requires_grad=False).long()
     for idx, (seq, seqlen) in enumerate(zip(X, lengths)):
-        sentence_in[idx, :seqlen] = torch.LongTensor(seq)
+        sentence[idx, :seqlen] = torch.LongTensor(seq)
     lengths = torch.LongTensor(lengths)
     lengths, perm_idx = lengths.sort(0, descending=True)
-    sentence_in = sentence_in[perm_idx]
+    sentence = sentence[perm_idx]
 
-    tag_scores = model(sentence_in, lengths)
+    tag_scores = model(sentence, lengths)
 
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
-    targets_in = autograd.Variable(targets)
+    targets_ground_truth = Variable(targets, requires_grad=False)     # delete it if possible
 
-    return tag_scores, targets_in
+    return tag_scores, targets_ground_truth
 
 
 def main(args):
@@ -532,21 +243,21 @@ def main(args):
     for epoch in range(NB_EPOCH):
         print("epoch : ", epoch)
         for i in range(0, (len(X) - 2*BATCH_SIZE), BATCH_SIZE):
-            print("batch {0}, total_batch {1}: ".format(int(i/BATCH_SIZE),int(len(X)/BATCH_SIZE)))
+            print("batch {0}, total_batch {1}: ".format(int(i/BATCH_SIZE), int(len(X)/BATCH_SIZE)))
             optimizer.zero_grad()
-            tag_scores, targets_in = predict(
+            tag_scores, targets_ground_truth = predict(
                 X[i:i+BATCH_SIZE],
                 y[i:i+BATCH_SIZE],
                 model,
                 input_length[i:i+BATCH_SIZE]
             )
-            loss = loss_function(tag_scores, targets_in, y_ix_to_word, input_length[i:i+BATCH_SIZE])
+            loss = loss_function(tag_scores, targets_ground_truth, y_ix_to_word, input_length[i:i+BATCH_SIZE])
             loss.backward()
             optimizer.step()
 
             print("current loss : ", loss.data)
 
-            acc = accuracy_function(tag_scores, targets_in)
+            acc = accuracy_function(tag_scores, targets_ground_truth)
             print('accuracy : ', acc)
             # p1 = list(model.parameters())[0].clone()
             # optimizer.step()
