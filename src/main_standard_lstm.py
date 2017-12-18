@@ -295,7 +295,7 @@ def run():
 
     # loss_function = nn.NLLLoss()
     loss_function = LossFunc(beta=10)
-    # accuracy_function = AccuracyFun()
+    accuracy_function = AccuracyFun()
 
     optimizer = optim.SGD(model.parameters(), lr=0.01)
 
@@ -369,8 +369,8 @@ def run():
 
             print("current loss : ", loss.data)
 
-            # acc = accuracy_function(tag_scores, targets_in)
-            # print('accuracy : ', acc)
+            acc = accuracy_function(tag_scores, targets_in)
+            print('accuracy : ', acc)
             # p1 = list(model.parameters())[0].clone()
             # optimizer.step()
             # p2 = list(model.parameters())[0].clone()

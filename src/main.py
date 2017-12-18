@@ -197,9 +197,6 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
     return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
 
 
-
-
-
 class RNNModel(nn.Module):
     '''
     doc me!
@@ -405,7 +402,6 @@ class LossFunc(nn.Module):
                         loss -= torch.log(targets_scores[batch][length][targets_in[batch][length]])
 
         return loss/size
-
 
 
 class AccuracyFun(nn.Module):
