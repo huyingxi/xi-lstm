@@ -53,14 +53,16 @@ def loss_func(
     for sentence_idx in range((y_truth).size()[0]):             # batch loop
         for word_idx in range((y_truth[0].size()[0])):     # words loop
             ground_truth_idx = y_truth[sentence_idx][word_idx]
+            predict_max_idx = max_index[sentence_idx][word_idx]
             if length_matrix[sentence_idx][word_idx] == 1:
-                if ground_truth_idx == y_truth[sentence_idx][word_idx]:
-                    if y_truth[sentence_idx][word_idx] == 0:  # take ['O'] 's value instead of zero
+                if torch.equal(predict_max_idx.data, torch.LongTensor(np.array([ground_truth_idx]))):
+                # if predict_max_idx == torch.LongTensor(ground_truth_idx):
+                    if ground_truth_idx == 0:  # take ['O'] 's value instead of zero
                         loss -= torch.log(
-                            y_predict[sentence_idx][word_idx][ground_truth_idx]
+                            y_predict[sentence_idx][word_idx][predict_max_idx]
                         )
                     else:
-                        loss -= beta * torch.log(y_predict[sentence_idx][word_idx][ground_truth_idx])
+                        loss -= beta * torch.log(y_predict[sentence_idx][word_idx][predict_max_idx])
                 else:
                     loss -= torch.log(y_predict[sentence_idx][word_idx][ground_truth_idx])
                     # ground_truth_idx = targets_ground_truth[sentence_idx][word_idx]

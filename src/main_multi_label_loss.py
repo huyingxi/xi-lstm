@@ -406,6 +406,7 @@ def predict(X, y, model, lengths):
 
     tag_scores = model(sentence_in, lengths)
 
+    import ipdb;ipdb.set_trace()
     tags = np.asarray(y)
     targets = torch.from_numpy(tags)
     targets_in = autograd.Variable(targets)
@@ -436,11 +437,11 @@ def run():
         max_len=188,
     )
 
-    # embedding_matrix_new = []
-    # for i in embedding_matrix:
-    #     embedding_matrix_new.append(i)
+    embedding_matrix_new = []
+    for i in embedding_matrix:
+        embedding_matrix_new.append(i)
 
-    embedding_matrix_new = embedding_matrix
+    # embedding_matrix_new = embedding_matrix
     c = list(zip(X, y, input_length))
     np.random.shuffle(c)
     X[:], y[:], input_length = zip(*c)
@@ -452,11 +453,11 @@ def run():
         len(y_word_to_ix),
         embedding_matrix_new,
     )
-    print(model)
+    # print(model)
 
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(name, param.data)
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name, param.data)
 
     # loss_function = nn.NLLLoss()
     # loss_function = LossFunc(beta=10)
@@ -508,7 +509,6 @@ def run():
 #            else:
 #                test_y[i][j] = y_word_to_ix['UNK']
 
-    count = 0
 
     log = open('data/log.txt', 'w')
 
