@@ -68,22 +68,22 @@ class XiRNNBase(Module):
         if self.mode == 'LSTMP' or self.mode == 'LSTMO':
             kwargs['recurrent_size'] = recurrent_size
 
-        self.cell0 = Cell(**kwargs)
+        self.cell0 = Cell(**kwargs).cuda()
         if self.bidirectional:
-            self.cell1 = Cell(**kwargs)
+            self.cell1 = Cell(**kwargs).cuda()
         for i in range(1, num_layers):
             kwargs['input_size'] = recurrent_size if self.mode == 'LSTMP' else hidden_size
-            cell = Cell(**kwargs)
+            cell = Cell(**kwargs).cuda()
             setattr(self, 'cell{}'.format(i), cell)
 
     def forward(self, input, initial_states, lengths):
         if initial_states is None:
-            zeros = Variable(torch.zeros(input.size(0), self.hidden_size))
+            zeros = Variable(torch.zeros(input.size(0), self.hidden_size).cuda())
             if self.mode == 'LSTMP':
-                zeros_h = Variable(torch.zeros(input.size(0), self.recurrent_size))
+                zeros_h = Variable(torch.zeros(input.size(0), self.recurrent_size).cuda())
                 initial_states = [(zeros_h, zeros), ] * self.num_layers
             elif self.mode == 'LSTMO':
-                zeros_h = Variable(torch.zeros(input.size(0), self.recurrent_size))
+                zeros_h = Variable(torch.zeros(input.size(0), self.recurrent_size).cuda())
                 initial_states = [(zeros_h, zeros, zeros_h), ] * self.num_layers
             else:
                 initial_states = [zeros] * self.num_layers
@@ -93,7 +93,7 @@ class XiRNNBase(Module):
 
         states = initial_states[0]
         outputs = []
-        length_matrix = np.zeros((64,188))
+        length_matrix = np.zeros((64, 188))
         for i in range(len(lengths)):
             for j in range(lengths[i]):
                 length_matrix[i][j] = 1
@@ -103,9 +103,9 @@ class XiRNNBase(Module):
             x = input[:, t, :]
             # for l in range(self.num_layers):
             if self.mode == 'LSTMP':
-                hx,cx = getattr(self, 'cell{}'.format(0))(x, states[0])
+                hx, cx = getattr(self, 'cell{}'.format(0))(x, states[0])
             elif self.mode == 'LSTMO':
-                hx,cx,tx = getattr(self, 'cell{}'.format(0))(x, states[0])
+                hx, cx, tx = getattr(self, 'cell{}'.format(0))(x, states[0])
             for j in range(len(length_matrix)):
                 if length_matrix[j][t]==0:
                     if self.mode == 'LSTMP':

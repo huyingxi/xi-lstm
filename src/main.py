@@ -5,6 +5,7 @@ import argparse
 import sys
 from typing import (
     Any,
+    Dict,
     List,
     Tuple,
 )
@@ -30,12 +31,12 @@ from tagger import (
 
 
 def loss_func(
-        y_predict,
-        y_truth,
-        y_ix_to_word,
-        lengths,
+        y_predict: Variable,
+        y_truth: LongTensor,
+        y_ix_to_word: List,
+        lengths: List,
         *,
-        beta=10,
+        beta: int=10,
 ) -> float:
     '''loss function
     '''
@@ -44,7 +45,7 @@ def loss_func(
         for j in range(lengths[i]):
             length_matrix[i][j] = 1
 
-    loss = Variable(torch.zeros(1))
+    loss = Variable(torch.zeros(1)).cuda()
     max_index = torch.max(y_predict, 2)[1]     # (64,188)
     # a = targets_ground_truth
     # a = a.numpy()
@@ -55,8 +56,9 @@ def loss_func(
             ground_truth_idx = y_truth[sentence_idx][word_idx]
             predict_max_idx = max_index[sentence_idx][word_idx]
             if length_matrix[sentence_idx][word_idx] == 1:
-                if torch.equal(predict_max_idx.data, torch.LongTensor(np.array([ground_truth_idx]))):
-                # if predict_max_idx == torch.LongTensor(ground_truth_idx):
+                # import ipdb; ipdb.set_trace()
+                if torch.equal(predict_max_idx.data, torch.LongTensor(np.array([ground_truth_idx])).cuda()):
+                    # if predict_max_idx == torch.LongTensor(ground_truth_idx):
                     if ground_truth_idx == 0:  # take ['O'] 's value instead of zero
                         loss -= torch.log(
                             y_predict[sentence_idx][word_idx][predict_max_idx]
@@ -79,10 +81,10 @@ def accuracy_func(
     '''
     total_num = len(torch.nonzero(y_truth))
 
-    ground_truth_modified = y_truth.clone()
-    ground_truth_modified[y_truth == 0] = -1
+    y_truth_modified = y_truth.clone()
+    y_truth_modified[y_truth == 0] = -1
 
-    hit_tags = (torch.max(y_predict, 2)[1].view(y_truth.size()).data == ground_truth_modified).sum()
+    hit_tags = (torch.max(y_predict, 2)[1].view(y_truth.size()).data.cpu() == y_truth_modified).sum()
 
     # a = targets_in.data
     # a = a.numpy()
@@ -91,8 +93,8 @@ def accuracy_func(
 
 
 def accuracy_func_test(
-    y_predict: Variable,
-    y_truth: LongTensor,
+        y_predict: Variable,
+        y_truth: LongTensor,
 ) -> float:
     '''
     accuracy test
@@ -112,8 +114,7 @@ def accuracy_func_test(
     return hit_tags/total_num
 
 
-
-def predict(
+def predict_bak(
         X: Variable,
         model: LSTMTagger,
         lengths: List[int],
@@ -160,19 +161,19 @@ def main(args: dict) -> int:
     np.random.shuffle(c)
     X[:], y[:], input_length[:] = zip(*c)
 
-    model = LSTMTagger(
+    tagger = LSTMTagger(
         EMBED_DIM,
         HIDDEN_DIM,
         len(X_word_to_idx),
         len(y_word_to_idx),
         embedding_weight,
-    )
+    ).cuda()
 
     sentence = torch.zeros((len(X), 188)).long()
     for idx, (seq, seqlen) in enumerate(zip(X, input_length)):
         sentence[idx, :seqlen] = torch.LongTensor(seq)
     sentence = Variable(sentence, requires_grad=False)
-    X = sentence
+    X = sentence.cuda()
 
     # print(model)
 
@@ -180,7 +181,7 @@ def main(args: dict) -> int:
     #     if param.requires_grad:
     #         print(name, param.data)
 
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
+    optimizer = optim.SGD(tagger.parameters(), lr=0.01)
 
     log = open('data/log.txt', 'w')
 
@@ -196,19 +197,23 @@ def main(args: dict) -> int:
                  )
             optimizer.zero_grad()
 
-            targets_ground_truth = torch.from_numpy(
+            y_truth = torch.from_numpy(
                 np.asarray(y[i:i+BATCH_SIZE])
             )
 
-            tag_scores = predict(
+            y_predict = tagger(
                 X[i:i+BATCH_SIZE],
-                model,
                 input_length[i:i+BATCH_SIZE]
             )
+            # tag_scores = predict(
+            #     X[i:i+BATCH_SIZE],
+            #     model,
+            #     input_length[i:i+BATCH_SIZE]
+            # )
 
             loss = loss_func(
-                tag_scores,
-                targets_ground_truth,
+                y_predict,
+                y_truth,
                 y_ix_to_word,
                 input_length[i:i+BATCH_SIZE],
             )
@@ -216,13 +221,14 @@ def main(args: dict) -> int:
             loss.backward()
             optimizer.step()
 
-            # print(type(tag_scores))
-            # print(type(targets_ground_truth))
+            acc = accuracy_func(y_predict, y_truth)
+            acc_test = accuracy_func_test(y_predict, y_truth)
 
-            acc = accuracy_func(tag_scores, targets_ground_truth)
-            acc_test = accuracy_func_test(tag_scores, targets_ground_truth)
-            print("current loss[%4.2f] / accuracy:[%4.2f] / accuracy_test:[%4.2f]"
+            print('current loss[%4.2f] / '
+                  'accuracy:[%4.2f] / '
+                  'accuracy_test:[%4.2f]'
                   % (loss.data[0], acc, acc_test))
+
     log.close()
 
     return 0
