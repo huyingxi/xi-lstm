@@ -108,23 +108,19 @@ def load_data(source, dist, word_index, embedding_weight, max_len):
 
     y_vocab = list(y_vocab_)
 
-    print("done")
     y_ix_to_word = [word for index, word in enumerate(y_vocab)]
     y_word_to_ix = {word: ix for ix, word in enumerate(y_ix_to_word)}
+    new_y = torch.zeros(len(y),188,len(y_vocab))
     for i, sentence in enumerate(y):
         for j, word in enumerate(sentence):
             for m, index in enumerate(word):
                 if len(index):
                     if index in y_word_to_ix:
-                        y[i][j][m] = y_word_to_ix[index]
-        round = X_max - len(sentence)
-        for n in range(round):
-            y[i].append(len(y_vocab)*[y_word_to_ix['O']])
+                        new_y[i][j][m] = y_word_to_ix[index]
 
-    seq_lengths = []
     seq_lengths = (map(len, X))
 
-
+    y = new_y
     return (X, word_index, index_word, y, y_word_to_ix, y_ix_to_word, embedding_weight,seq_lengths)
 
 
@@ -411,7 +407,6 @@ def predict(X, y, model, lengths):
     tag_scores = model(sentence_in, lengths)
 
     tags = np.asarray(y)
-    import ipdb;ipdb.set_trace()
     targets = torch.from_numpy(tags)
     targets_in = autograd.Variable(targets)
 
@@ -440,12 +435,12 @@ def run():
         embedding_matrix,
         max_len=188,
     )
-    import ipdb;ipdb.set_trace()
 
-    embedding_matrix_new = []
-    for i in embedding_matrix:
-        embedding_matrix_new.append(i)
+    # embedding_matrix_new = []
+    # for i in embedding_matrix:
+    #     embedding_matrix_new.append(i)
 
+    embedding_matrix_new = embedding_matrix
     c = list(zip(X, y, input_length))
     np.random.shuffle(c)
     X[:], y[:], input_length = zip(*c)

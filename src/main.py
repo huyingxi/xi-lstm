@@ -78,7 +78,7 @@ def accuracy_func(
     total_num = len(torch.nonzero(y_truth))
 
     ground_truth_modified = y_truth.clone()
-    ground_truth_modified[y_truth == 0] = 1
+    ground_truth_modified[y_truth == 0] = -1
 
     hit_tags = (torch.max(y_predict, 2)[1].view(y_truth.size()).data == ground_truth_modified).sum()
 
@@ -86,6 +86,29 @@ def accuracy_func(
     # a = a.numpy()
     # size = len(a)
     return hit_tags/total_num
+
+
+def accuracy_func_test(
+    y_predict: Variable,
+    y_truth: LongTensor,
+) -> float:
+    '''
+    accuracy test
+    '''
+    total_num = len(torch.nonzero(y_truth))
+
+    ground_truth_modified = y_truth.clone()
+    ground_truth_modified[y_truth == 0] = -1
+
+    hit_tags = 0
+    for i in range(len(y_truth)):  # batch loop
+        for j in range(len(y_truth[i])):   # words loop
+            if y_truth[i][j] != 0 :
+                if(y_truth[i][j] in np.array(torch.sort(y_predict[i][j], -1, True)[1][:10].data)):  # if top 10 hits
+                    hit_tags += 1
+
+    return hit_tags/total_num
+
 
 
 def predict(
@@ -195,8 +218,9 @@ def main(args: dict) -> int:
             # print(type(targets_ground_truth))
 
             acc = accuracy_func(tag_scores, targets_ground_truth)
-            print("current loss[%4.2f] / accuracy:[%4.2f]"
-                  % (loss.data[0], acc))
+            acc_test = accuracy_func_test(tag_scores, targets_ground_truth)
+            print("current loss[%4.2f] / accuracy:[%4.2f] / accuracy_test:[%4.2f]"
+                  % (loss.data[0], acc, acc_test))
     log.close()
 
     return 0
